@@ -1,44 +1,102 @@
 [
   {
-    "id": "nvidia_h200", "vendor": "NVIDIA", "name": "H200", "category": "GPU",
-    "memoryGB": 141, "memoryType": "HBM3e", "memoryBandwidthGBps": 4800, "typicalBoardPowerW": 700,
-    "sourceId": "nvidia_h200", "url": "https://www.nvidia.com/en-us/data-center/h200/", "lastReviewed": "2026-07-03",
-    "defaultBench": { "70B-class": 1100, "8B-class": 10000 },
-    "benchNote": "ESTIMATED conservative defaults. 70B-class from NVIDIA NIM benchmarking docs (Llama-3.3-70B FP8 on 2x H200, 2,338 output tok/s total, halved and rounded down). 8B-class from the same docs (Llama-3.1-8B FP8 on 1x H200, 12,826 tok/s, rounded down). Serving/batched mode, not single stream. Override with a measured value.",
-    "benchSources": ["https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html"],
+    "id": "nvidia_h200",
+    "vendor": "NVIDIA",
+    "name": "H200",
+    "category": "GPU",
+    "memoryGB": 141,
+    "memoryType": "HBM3e",
+    "memoryBandwidthGBps": 4800,
+    "typicalBoardPowerW": 700,
+    "sourceId": "nvidia_h200",
+    "url": "https://www.nvidia.com/en-us/data-center/h200/",
+    "lastReviewed": "2026-07-03",
+    "defaultBench": {
+      "70B-class": 1100,
+      "8B-class": 10000
+    },
+    "benchNote": "ESTIMATED conservative defaults. 70B-class from NVIDIA NIM benchmarking docs (Llama-3.3-70B FP8 on 2x H200, 2,338 output tok/s total, halved and rounded down). 8B-class from the same docs (Llama-3.1-8B FP8 on 1x H200, 12,826 tok/s, rounded down). Serving/batched mode, not single stream. Override with a measured value. NOTE: this FP8 figure is conservative; the RTX PRO 6000 default uses an FP4 source. Defaults use different precisions and are NOT a head-to-head ranking; enter measured values for comparisons.",
+    "benchSources": [
+      "https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html"
+    ],
     "notes": "Larger private inference, long context, high memory GPU serving. SXM (HGX baseboards) or NVL PCIe variants."
   },
   {
-    "id": "nvidia_rtx_pro_6000_blackwell", "vendor": "NVIDIA", "name": "RTX PRO 6000 Blackwell Server Edition", "category": "GPU",
-    "memoryGB": 96, "memoryType": "GDDR7 ECC", "memoryBandwidthGBps": 1597, "typicalBoardPowerW": 600,
-    "sourceId": "nvidia_rtx_pro_6000_blackwell", "url": "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/", "lastReviewed": "2026-07-03",
-    "defaultBench": { "70B-class": 1500, "8B-class": 3000 },
-    "benchNote": "ESTIMATED conservative defaults. 70B-class from NVIDIA TensorRT-LLM perf-overview (Llama-3.3-70B NVFP4, 1,724 output tok/s per GPU, rounded down). 8B-class from a measured vLLM FP16 run (3,196 tok/s, unquantized; FP8/FP4 serves faster). Override with a measured value.",
-    "benchSources": ["https://nvidia.github.io/TensorRT-LLM/latest/developer-guide/perf-overview.html", "https://www.databasemart.com/blog/vllm-gpu-benchmark-pro6000"],
+    "id": "nvidia_rtx_pro_6000_blackwell",
+    "vendor": "NVIDIA",
+    "name": "RTX PRO 6000 Blackwell Server Edition",
+    "category": "GPU",
+    "memoryGB": 96,
+    "memoryType": "GDDR7 ECC",
+    "memoryBandwidthGBps": 1597,
+    "typicalBoardPowerW": 600,
+    "sourceId": "nvidia_rtx_pro_6000_blackwell",
+    "url": "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/",
+    "lastReviewed": "2026-07-03",
+    "defaultBench": {
+      "70B-class": 1500,
+      "8B-class": 3000
+    },
+    "benchNote": "ESTIMATED conservative defaults. 70B-class from NVIDIA TensorRT-LLM perf-overview (Llama-3.3-70B NVFP4, 1,724 output tok/s per GPU, rounded down). 8B-class from a measured vLLM FP16 run (3,196 tok/s, unquantized; FP8/FP4 serves faster). Override with a measured value. NOTE: FP4 source; not directly comparable to the H200 FP8 default.",
+    "benchSources": [
+      "https://nvidia.github.io/TensorRT-LLM/latest/developer-guide/perf-overview.html",
+      "https://www.databasemart.com/blog/vllm-gpu-benchmark-pro6000"
+    ],
     "notes": "Practical private inference: departmental agents, RAG, embeddings, small and medium open models. PCIe Gen5, MIG up to 4 instances."
   },
   {
-    "id": "amd_mi355x", "vendor": "AMD", "name": "Instinct MI355X", "category": "GPU",
-    "memoryGB": 288, "memoryType": "HBM3E", "memoryBandwidthGBps": 8000, "typicalBoardPowerW": 1400,
-    "sourceId": "amd_mi355x", "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html", "lastReviewed": "2026-07-03",
-    "defaultBench": { "70B-class": 1500, "8B-class": 9000 },
+    "id": "amd_mi355x",
+    "vendor": "AMD",
+    "name": "Instinct MI355X",
+    "category": "GPU",
+    "memoryGB": 288,
+    "memoryType": "HBM3E",
+    "memoryBandwidthGBps": 8000,
+    "typicalBoardPowerW": 1400,
+    "sourceId": "amd_mi355x",
+    "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html",
+    "lastReviewed": "2026-07-03",
+    "defaultBench": {
+      "70B-class": 1500,
+      "8B-class": 9000
+    },
     "benchNote": "ESTIMATED conservative defaults. 70B-class from MLPerf Inference v6.0 AMD submission (Llama2-70B FP4 server scenario, 12,535 tok/s on 8x MI355X, divided per GPU and rounded down). 8B-class from AMD ROCm blog (Llama-3.1-8B FP8 vLLM, 9,979 tok/s, rounded down). Override with a measured value.",
-    "benchSources": ["https://mlcommons.org/benchmarks/inference-datacenter/", "https://rocm.blogs.amd.com/artificial-intelligence/w4a6-quant-mm/README.html"],
+    "benchSources": [
+      "https://mlcommons.org/benchmarks/inference-datacenter/",
+      "https://rocm.blogs.amd.com/artificial-intelligence/w4a6-quant-mm/README.html"
+    ],
     "notes": "High memory private inference and large model workloads. Required warning: validate ROCm, model serving engine, and application stack compatibility before recommending."
   },
   {
-    "id": "hpe_dl380a_gen12", "vendor": "HPE", "name": "ProLiant Compute DL380a Gen12", "category": "server",
-    "memoryGB": null, "memoryType": null, "memoryBandwidthGBps": null, "typicalBoardPowerW": null,
-    "maxSystemMemory": "Up to 8 TB DDR5", "formFactor": "4U rack",
+    "id": "hpe_dl380a_gen12",
+    "vendor": "HPE",
+    "name": "ProLiant Compute DL380a Gen12",
+    "category": "server",
+    "memoryGB": null,
+    "memoryType": null,
+    "memoryBandwidthGBps": null,
+    "typicalBoardPowerW": null,
+    "maxSystemMemory": "Up to 8 TB DDR5",
+    "formFactor": "4U rack",
     "gpuSupport": "Up to 16x NVIDIA L4, or up to 10x L40S / H100 NVL / H200 NVL, or up to 8x RTX PRO 6000 Blackwell Server Edition",
-    "sourceId": "hpe_dl380a_gen12", "url": "https://www.hpe.com/us/en/compute/hpe-proliant-compute/dl380a-gen12.html", "lastReviewed": "2026-07-03",
+    "sourceId": "hpe_dl380a_gen12",
+    "url": "https://www.hpe.com/us/en/compute/hpe-proliant-compute/dl380a-gen12.html",
+    "lastReviewed": "2026-07-03",
     "notes": "Departmental AI, enterprise inference, private agent pilots, RAG and agent serving, medium private inference."
   },
   {
-    "id": "hpe_xd685", "vendor": "HPE", "name": "ProLiant Compute XD685", "category": "server",
-    "memoryGB": null, "memoryType": null, "memoryBandwidthGBps": null, "typicalBoardPowerW": null,
+    "id": "hpe_xd685",
+    "vendor": "HPE",
+    "name": "ProLiant Compute XD685",
+    "category": "server",
+    "memoryGB": null,
+    "memoryType": null,
+    "memoryBandwidthGBps": null,
+    "typicalBoardPowerW": null,
     "gpuSupport": "Eight NVIDIA B300 / B200 / H200, or eight AMD Instinct MI355X accelerators",
-    "sourceId": "hpe_xd685", "url": "https://buy.hpe.com/in/en/compute/rack-servers/proliant-compute-xd600-servers/hpe-proliant-compute-xd685/p/1014862906", "lastReviewed": "2026-07-03",
+    "sourceId": "hpe_xd685",
+    "url": "https://buy.hpe.com/in/en/compute/rack-servers/proliant-compute-xd600-servers/hpe-proliant-compute-xd685/p/1014862906",
+    "lastReviewed": "2026-07-03",
     "notes": "Large private inference, AI platform scale, training and tuning, larger accelerators. Accelerator support claims from the HPE product listing; verify exact configuration with HPE before recommending."
   }
 ]

@@ -1,134 +1,417 @@
 {
   "comment": "Route scoring weights. DRAFT authored by Larry 2026-07-03, pending Fred's line-by-line review (decision 0.2.6). Each weight has default, min, max; the UI exposes a slider across that range. Factors are 0-3 Likert inputs unless noted. Scores normalize to 0-100 against each route's maximum possible raw score.",
   "policyPoints": {
-    "dataCannotLeave": { "default": 30, "min": 20, "max": 40, "note": "data cannot leave the environment" },
-    "dataWithControls": { "default": 15, "min": 5, "max": 20, "note": "data can leave only with controls" },
-    "regulatedData": { "default": 20, "min": 10, "max": 30 },
-    "residencyRequired": { "default": 15, "min": 5, "max": 20 },
-    "airGapRequired": { "default": 15, "min": 10, "max": 25 },
-    "auditTrailRequired": { "default": 10, "min": 5, "max": 15 },
-    "highSensitivity": { "default": 10, "min": 5, "max": 15 }
+    "dataCannotLeave": {
+      "default": 30,
+      "min": 20,
+      "max": 40,
+      "note": "data cannot leave the environment"
+    },
+    "dataWithControls": {
+      "default": 15,
+      "min": 5,
+      "max": 20,
+      "note": "data can leave only with controls"
+    },
+    "regulatedData": {
+      "default": 20,
+      "min": 10,
+      "max": 30
+    },
+    "residencyRequired": {
+      "default": 15,
+      "min": 5,
+      "max": 20
+    },
+    "airGapRequired": {
+      "default": 15,
+      "min": 10,
+      "max": 25
+    },
+    "auditTrailRequired": {
+      "default": 10,
+      "min": 5,
+      "max": 15
+    },
+    "highSensitivity": {
+      "default": 10,
+      "min": 5,
+      "max": 15
+    }
   },
   "routes": {
     "direct": {
       "label": "Direct model provider",
-      "sourceIds": ["anthropic_pricing", "openai_api_pricing"],
+      "sourceIds": [
+        "anthropic_pricing",
+        "openai_api_pricing"
+      ],
       "weights": {
-        "needTimeToValue": { "default": 10, "min": 5, "max": 15 },
-        "needQuality": { "default": 10, "min": 5, "max": 15 },
-        "needLowOps": { "default": 10, "min": 5, "max": 15 },
-        "burstyBonus": { "default": 15, "min": 5, "max": 25 }
+        "needTimeToValue": {
+          "default": 10,
+          "min": 5,
+          "max": 15
+        },
+        "needQuality": {
+          "default": 10,
+          "min": 5,
+          "max": 15
+        },
+        "needLowOps": {
+          "default": 10,
+          "min": 5,
+          "max": 15
+        },
+        "burstyBonus": {
+          "default": 15,
+          "min": 5,
+          "max": 25
+        }
       },
       "penalties": {
-        "privatePolicyFactor": { "default": 0.6, "min": 0.3, "max": 1.0, "note": "multiplied by privatePolicyScore" },
-        "residencyPenalty": { "default": 15, "min": 5, "max": 30 }
+        "privatePolicyFactor": {
+          "default": 0.6,
+          "min": 0.3,
+          "max": 1.0,
+          "note": "multiplied by privatePolicyScore"
+        },
+        "residencyPenalty": {
+          "default": 15,
+          "min": 5,
+          "max": 30
+        }
       }
     },
     "cloud": {
       "label": "Cloud model service (Azure OpenAI / Bedrock / Gemini)",
-      "sourceIds": ["azure_openai_pricing", "aws_bedrock_pricing", "gemini_api_pricing"],
+      "sourceIds": [
+        "azure_openai_pricing",
+        "aws_bedrock_pricing",
+        "gemini_api_pricing"
+      ],
       "weights": {
-        "directCarryFactor": { "default": 0.8, "min": 0.5, "max": 1.0, "note": "carries the direct score" },
-        "cloudPreferenceMatch": { "default": 20, "min": 10, "max": 30 },
-        "marketplaceBilling": { "default": 10, "min": 5, "max": 20 },
-        "residencyFriendly": { "default": 10, "min": 5, "max": 20 }
+        "directCarryFactor": {
+          "default": 0.8,
+          "min": 0.5,
+          "max": 1.0,
+          "note": "carries the direct score"
+        },
+        "cloudPreferenceMatch": {
+          "default": 20,
+          "min": 10,
+          "max": 30
+        },
+        "marketplaceBilling": {
+          "default": 10,
+          "min": 5,
+          "max": 20
+        },
+        "residencyFriendly": {
+          "default": 10,
+          "min": 5,
+          "max": 20
+        }
       }
     },
     "airia": {
       "label": "Airia governed agent platform",
-      "sourceIds": ["airia_platform"],
+      "sourceIds": [
+        "airia_platform"
+      ],
       "weights": {
-        "needGovernance": { "default": 8, "min": 4, "max": 12 },
-        "needAgentBuilder": { "default": 8, "min": 4, "max": 12 },
-        "needIntegration": { "default": 7, "min": 3, "max": 10 },
-        "needModelRouting": { "default": 7, "min": 3, "max": 10 },
-        "needAudit": { "default": 6, "min": 3, "max": 10 },
-        "needTimeToValue": { "default": 5, "min": 2, "max": 8 },
-        "needBusinessUserCreation": { "default": 6, "min": 3, "max": 10 }
+        "needGovernance": {
+          "default": 8,
+          "min": 4,
+          "max": 12
+        },
+        "needAgentBuilder": {
+          "default": 8,
+          "min": 4,
+          "max": 12
+        },
+        "needIntegration": {
+          "default": 7,
+          "min": 3,
+          "max": 10
+        },
+        "needModelRouting": {
+          "default": 7,
+          "min": 3,
+          "max": 10
+        },
+        "needAudit": {
+          "default": 6,
+          "min": 3,
+          "max": 10
+        },
+        "needTimeToValue": {
+          "default": 5,
+          "min": 2,
+          "max": 8
+        },
+        "needBusinessUserCreation": {
+          "default": 6,
+          "min": 3,
+          "max": 10
+        }
       },
       "penalties": {
-        "strictPrivateExecution": { "default": 25, "min": 10, "max": 40, "note": "air gap or hard on-prem requirement" },
-        "softPrivateExecution": { "default": 15, "min": 5, "max": 25, "note": "data cannot leave" }
+        "strictPrivateExecution": {
+          "default": 32,
+          "min": 10,
+          "max": 40,
+          "note": "air gap or hard on-prem requirement; raised from 25 per persona audit"
+        },
+        "softPrivateExecution": {
+          "default": 15,
+          "min": 5,
+          "max": 25,
+          "note": "data cannot leave"
+        }
       }
     },
     "kamiwaza": {
       "label": "Kamiwaza private AI orchestration",
-      "sourceIds": ["kamiwaza_product"],
+      "sourceIds": [
+        "kamiwaza_product"
+      ],
       "weights": {
-        "privatePolicyFactor": { "default": 0.5, "min": 0.3, "max": 0.7, "note": "multiplied by privatePolicyScore" },
-        "needDataGravity": { "default": 8, "min": 4, "max": 12 },
-        "privateExecutionHard": { "default": 15, "min": 8, "max": 25 },
-        "privateExecutionSoft": { "default": 8, "min": 4, "max": 12 },
-        "needOntology": { "default": 7, "min": 3, "max": 10 },
-        "needInternalApis": { "default": 6, "min": 3, "max": 10 },
-        "needEnterpriseRetrieval": { "default": 6, "min": 3, "max": 10 }
+        "privatePolicyFactor": {
+          "default": 0.5,
+          "min": 0.3,
+          "max": 0.7,
+          "note": "multiplied by privatePolicyScore"
+        },
+        "needDataGravity": {
+          "default": 8,
+          "min": 4,
+          "max": 12
+        },
+        "privateExecutionHard": {
+          "default": 15,
+          "min": 8,
+          "max": 25
+        },
+        "privateExecutionSoft": {
+          "default": 8,
+          "min": 4,
+          "max": 12
+        },
+        "needOntology": {
+          "default": 7,
+          "min": 3,
+          "max": 10
+        },
+        "needInternalApis": {
+          "default": 6,
+          "min": 3,
+          "max": 10
+        },
+        "needEnterpriseRetrieval": {
+          "default": 6,
+          "min": 3,
+          "max": 10
+        }
       }
     },
     "btg": {
       "label": "Build Technology Group strategy partner",
-      "sourceIds": ["btg_ai_consulting"],
+      "sourceIds": [
+        "btg_ai_consulting"
+      ],
       "weights": {
-        "readinessGap": { "default": 10, "min": 5, "max": 15 },
-        "useCaseAmbiguity": { "default": 10, "min": 5, "max": 15 },
-        "needVendorSelection": { "default": 8, "min": 4, "max": 12 },
-        "integrationComplexity": { "default": 7, "min": 3, "max": 10 },
-        "needGovernancePlanning": { "default": 7, "min": 3, "max": 10 }
+        "readinessGap": {
+          "default": 10,
+          "min": 5,
+          "max": 15
+        },
+        "useCaseAmbiguity": {
+          "default": 10,
+          "min": 5,
+          "max": 15
+        },
+        "needVendorSelection": {
+          "default": 8,
+          "min": 4,
+          "max": 12
+        },
+        "integrationComplexity": {
+          "default": 7,
+          "min": 3,
+          "max": 10
+        },
+        "needGovernancePlanning": {
+          "default": 7,
+          "min": 3,
+          "max": 10
+        }
       }
     },
     "hpePcai": {
       "label": "HPE Private Cloud AI",
-      "sourceIds": ["hpe_private_cloud_ai"],
+      "sourceIds": [
+        "hpe_private_cloud_ai"
+      ],
       "weights": {
-        "privatePolicyFactor": { "default": 0.4, "min": 0.2, "max": 0.6 },
-        "needGovernance": { "default": 5, "min": 2, "max": 8 },
-        "hpePreference": { "default": 12, "min": 6, "max": 18 },
-        "nvidiaPreference": { "default": 6, "min": 3, "max": 10 },
-        "opsReadiness": { "default": 6, "min": 3, "max": 10 }
+        "privatePolicyFactor": {
+          "default": 0.4,
+          "min": 0.2,
+          "max": 0.6
+        },
+        "needGovernance": {
+          "default": 5,
+          "min": 2,
+          "max": 8
+        },
+        "hpePreference": {
+          "default": 12,
+          "min": 6,
+          "max": 18
+        },
+        "nvidiaPreference": {
+          "default": 6,
+          "min": 3,
+          "max": 10
+        },
+        "opsReadiness": {
+          "default": 6,
+          "min": 3,
+          "max": 10
+        }
       }
     },
     "rentedGpu": {
       "label": "Rented GPU validation",
-      "sourceIds": ["lambda_pricing"],
+      "sourceIds": [
+        "lambda_pricing"
+      ],
       "weights": {
-        "tokenCostPressure": { "default": 25, "min": 10, "max": 35, "note": "scaled by provider monthly cost" },
-        "benchmarkNeed": { "default": 15, "min": 8, "max": 25, "note": "no measured benchmark exists" },
-        "usageUncertainty": { "default": 20, "min": 10, "max": 30 },
-        "privateModelCandidate": { "default": 15, "min": 8, "max": 25 }
+        "tokenCostPressure": {
+          "default": 25,
+          "min": 10,
+          "max": 35,
+          "note": "scaled by provider monthly cost"
+        },
+        "benchmarkNeed": {
+          "default": 15,
+          "min": 8,
+          "max": 25,
+          "note": "no measured benchmark exists"
+        },
+        "usageUncertainty": {
+          "default": 20,
+          "min": 10,
+          "max": 30
+        },
+        "privateModelCandidate": {
+          "default": 15,
+          "min": 8,
+          "max": 25
+        }
       },
       "penalties": {
-        "opsReadinessFactor": { "default": 5, "min": 0, "max": 10, "note": "high ops readiness reduces the need to rent first" }
+        "opsReadinessFactor": {
+          "default": 5,
+          "min": 0,
+          "max": 10,
+          "note": "high ops readiness reduces the need to rent first"
+        }
       }
     },
     "owned": {
       "label": "Owned private inference hardware",
-      "sourceIds": ["hpe_dl380a_gen12", "nvidia_h200", "amd_mi355x"],
+      "sourceIds": [
+        "hpe_dl380a_gen12",
+        "nvidia_h200",
+        "amd_mi355x"
+      ],
       "weights": {
-        "costGate": { "default": 30, "min": 15, "max": 40, "note": "scaled by usage versus break even" },
-        "privatePolicyFactor": { "default": 0.3, "min": 0.15, "max": 0.5 },
-        "steadyUsage": { "default": 15, "min": 8, "max": 25 },
-        "opsReadiness": { "default": 7, "min": 3, "max": 10 },
-        "qualityValidated": { "default": 10, "min": 5, "max": 15, "note": "a measured benchmark exists" },
-        "procurementFit": { "default": 3, "min": 1, "max": 5, "note": "per vendor preference point" }
+        "costGate": {
+          "default": 30,
+          "min": 15,
+          "max": 40,
+          "note": "scaled by usage versus break even"
+        },
+        "privatePolicyFactor": {
+          "default": 0.3,
+          "min": 0.15,
+          "max": 0.5
+        },
+        "steadyUsage": {
+          "default": 15,
+          "min": 8,
+          "max": 25
+        },
+        "opsReadiness": {
+          "default": 7,
+          "min": 3,
+          "max": 10
+        },
+        "qualityValidated": {
+          "default": 10,
+          "min": 5,
+          "max": 15,
+          "note": "a measured benchmark exists"
+        },
+        "procurementFit": {
+          "default": 3,
+          "min": 1,
+          "max": 5,
+          "note": "per vendor preference point"
+        }
       },
       "penalties": {
-        "usageUncertaintyPenalty": { "default": 20, "min": 10, "max": 35 }
+        "usageUncertaintyPenalty": {
+          "default": 20,
+          "min": 10,
+          "max": 35
+        }
       }
     },
     "hybrid": {
       "label": "Hybrid route",
       "sourceIds": [],
       "weights": {
-        "workloadDiversity": { "default": 15, "min": 8, "max": 25 },
-        "escalationNeed": { "default": 10, "min": 5, "max": 15 },
-        "needModelRouting": { "default": 5, "min": 2, "max": 8 },
-        "policyMixed": { "default": 15, "min": 8, "max": 25 },
-        "routeFlexibility": { "default": 5, "min": 2, "max": 8 }
+        "workloadDiversity": {
+          "default": 15,
+          "min": 8,
+          "max": 25
+        },
+        "escalationNeed": {
+          "default": 10,
+          "min": 5,
+          "max": 15
+        },
+        "needModelRouting": {
+          "default": 5,
+          "min": 2,
+          "max": 8
+        },
+        "policyMixed": {
+          "default": 10,
+          "min": 8,
+          "max": 25,
+          "note": "lowered from 15 per persona audit: hybrid crowded co-recommendations"
+        },
+        "routeFlexibility": {
+          "default": 5,
+          "min": 2,
+          "max": 8
+        }
       }
     }
   },
-  "coRecommendMarginPoints": { "default": 10, "min": 5, "max": 15 },
+  "coRecommendMarginPoints": {
+    "default": 10,
+    "min": 5,
+    "max": 15
+  },
   "doNotSizeYet": {
     "note": "Fires and beats every route when any critical gate is unanswered (decision 0.2.8).",
-    "criticalGates": ["policyGateAnswered", "usageVolumeKnown", "budgetConfidenceKnown"]
+    "criticalGates": [
+      "policyGateAnswered",
+      "usageVolumeKnown",
+      "budgetConfidenceKnown"
+    ]
   }
 }

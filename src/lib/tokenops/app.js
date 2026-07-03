@@ -4,7 +4,7 @@
 
 import { engine } from './formulas.js';
 import { validateInputs, fmt, money } from './engine.js';
-import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers } from './costs.js';
+import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers, primaryLeverOf } from './costs.js';
 import { recommend, confidence, discoveryQuestions, privatePolicyScore } from './routes.js';
 import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LABELS } from './sections.js';
 import * as C from './components.js';
@@ -68,7 +68,8 @@ export function createApp(root, data) {
       : state.usageConfidence !== 'measured' ? 'Usage is estimated; the whole cost picture moves with it.'
       : state.userBenchmarkTpsPerGpu == null ? 'Throughput sizing rests on a labeled benchmark estimate.'
       : 'Public list pricing may not match contract pricing.';
-    if (levers.length) rec.primaryLever = `${levers[0].label} (saves about ${Math.round(levers[0].savings).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} per month).`;
+    const lever0 = primaryLeverOf(levers);
+    if (lever0) rec.primaryLever = `${lever0.label} (saves about ${Math.round(lever0.savings).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} per month).`;
     const disc = discoveryQuestions(state);
     const policy = privatePolicyScore(state, rules, weightOverrides);
     return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy };
@@ -129,8 +130,10 @@ export function createApp(root, data) {
       route: cx.rec.kind === 'do-not-size' ? 'Do not size yet' : cx.rec.top.label,
       why: cx.rec.rulesFired.slice(0, 3),
       breakEvenMTok: cx.be?.result,
-      ceilingMonthly: cx.ceiling.ceilingMonthly,
-      costPerMillion: cx.values.totalMonthlyTokens ? cx.providerBaseline / (cx.values.totalMonthlyTokens / 1e6) : null,
+      // Same basis as breakEvenTokens: the sentence must reproduce its own
+      // arithmetic (audit finding). Budget is quote-derived when a quote exists.
+      ceilingMonthly: cx.be?.monthlyBudget,
+      costPerMillion: cx.be?.weightedCostPerMillion,
       next: cx.rec.nextAction,
     });
     const econ = `<div class="card" id="econ-card">
@@ -142,9 +145,12 @@ export function createApp(root, data) {
         <input id="f-gpuQuote-inline" type="number" min="0" step="1000" data-field="gpuQuote" value="${state.gpuQuote ?? ''}">
         ${cx.ceiling.verdict ? `<p class="verdict ${cx.ceiling.verdict.under ? 'under' : 'over'}">${cx.ceiling.verdict.under ? 'UNDER the ceiling' : 'OVER the ceiling'} by ${money(cx.ceiling.verdict.delta)} (${money(cx.ceiling.verdict.monthlyEquivalent)} per month equivalent). ${cx.ceiling.verdict.under ? 'This quote beats the token route by your required margin.' : 'This quote does not beat the token route. Negotiate or stay on tokens.'}</p>` : ''}
       </div>
+      <p class="dim">Ceiling baseline in use: ${state.ceilingBaseline === 'selected' ? 'your selected role routing total' : 'the cheapest provider family total'} (change under Economics and the ceiling).</p>
+      ${cx.selected.missingRoles?.length ? `<p class="warn warn-caution"><span class="warn-tag">caution</span> No price for ${cx.selected.missingRoles.join(', ')}. Those tokens are counted in demand but excluded from every dollar figure until a rate is entered.</p>` : ''}
+      ${state.ragEnabled && state.embeddingPricePerMillion == null ? `<p class="warn warn-info"><span class="warn-tag">info</span> RAG is on but no embedding price is set, so embedding cost is excluded from provider totals. Enter one in RAG and retrieval.</p>` : ''}
       ${cx.ceiling.traces.map((t) => C.formulaTrace(t, sources)).join('')}
       ${C.formulaTrace(cx.be, sources)}
-      ${C.breakEvenChart(cx.be, cx.ceiling.ceilingMonthly, cx.providerBaseline, (cx.values.totalMonthlyTokens ?? 0) / 1e6)}
+      ${C.breakEvenChart(cx.be, cx.providerBaseline)}
       ${cx.caching ? C.formulaTrace(cx.caching, sources) : ''}
       ${cx.rented ? C.formulaTrace(cx.rented, sources) : ''}
     </div>`;

@@ -37,13 +37,29 @@ function normalized(raw, max) {
    normalization can never go stale (audit finding). Kind table says how each
    weight scales at its best case. */
 const WEIGHT_KIND = {
-  likert: ['needTimeToValue', 'needQuality', 'needLowOps', 'needGovernance', 'needAgentBuilder', 'needIntegration', 'needModelRouting', 'needAudit', 'needBusinessUserCreation', 'needDataGravity', 'needOntology', 'needInternalApis', 'needEnterpriseRetrieval', 'readinessGap', 'useCaseAmbiguity', 'needVendorSelection', 'integrationComplexity', 'needGovernancePlanning', 'hpePreference', 'nvidiaPreference', 'opsReadiness'],
+  // routeFlexibility scales by the 0-3 model-routing need in scoring, so its
+  // max is 3x too (audit finding: hybrid raw could exceed its own max).
+  likert: ['needTimeToValue', 'needQuality', 'needLowOps', 'needGovernance', 'needAgentBuilder', 'needIntegration', 'needModelRouting', 'needAudit', 'needBusinessUserCreation', 'needDataGravity', 'needOntology', 'needInternalApis', 'needEnterpriseRetrieval', 'readinessGap', 'useCaseAmbiguity', 'needVendorSelection', 'integrationComplexity', 'needGovernancePlanning', 'hpePreference', 'nvidiaPreference', 'opsReadiness', 'routeFlexibility'],
   policyFactor: ['privatePolicyFactor'],
   procurement: ['procurementFit'],
 };
+// Mutually exclusive weight pairs: only the larger can ever fire, so the
+// theoretical max counts one of them, not both (audit finding: Kamiwaza).
+const EXCLUSIVE_PAIRS = [['privateExecutionHard', 'privateExecutionSoft']];
 function routeMax(rules, route, overrides, directMax = 0) {
   let max = 0;
-  for (const [k, def] of Object.entries(rules.routes[route]?.weights ?? {})) {
+  const entries = Object.entries(rules.routes[route]?.weights ?? {});
+  const excluded = new Set();
+  for (const [a, b] of EXCLUSIVE_PAIRS) {
+    const has = entries.filter(([k]) => k === a || k === b);
+    if (has.length === 2) {
+      const va = overrides?.[`${route}.${a}`] ?? rules.routes[route].weights[a].default;
+      const vb = overrides?.[`${route}.${b}`] ?? rules.routes[route].weights[b].default;
+      excluded.add(va >= vb ? b : a);
+    }
+  }
+  for (const [k, def] of entries) {
+    if (excluded.has(k)) continue;
     const val = overrides?.[`${route}.${k}`] ?? def.default;
     if (WEIGHT_KIND.likert.includes(k)) max += 3 * val;
     else if (WEIGHT_KIND.policyFactor.includes(k)) max += 100 * val;
@@ -63,7 +79,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
     const raw = comps.reduce((a, c) => a + c.points, 0) - pens.reduce((a, c) => a + c.points, 0);
     const max = routeMax(rules, key, overrides, directMaxRef.value);
     if (key === 'direct') directMaxRef.value = max;
-    routes.push({ key, label, raw, max, score: normalized(raw, max), components: comps.filter((c) => c.points !== 0), penalties: pens.filter((c) => c.points !== 0), sourceIds: rules.routes[key]?.sourceIds || [] });
+    routes.push({ key, label, raw, max, score: normalized(raw, max), components: comps.filter((c) => c.points !== 0 || c.keep), penalties: pens.filter((c) => c.points !== 0), sourceIds: rules.routes[key]?.sourceIds || [] });
   };
 
   // Direct provider
@@ -161,7 +177,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
     const useVsBe = hasQuote ? (ctx.usageVersusBreakEven ?? 0) : 0;
     const costGateShare = useVsBe >= 1 ? 1 : Math.max(0, useVsBe);
     const c = [
-      { label: hasQuote ? `Cost gate (usage at ${fmt(useVsBe * 100, 0)} percent of quote break even)` : 'Cost gate inert: no hardware quote entered', points: costGateShare * w(rules, 'owned', 'costGate', overrides) },
+      { label: hasQuote ? `Cost gate (usage at ${fmt(useVsBe * 100, 0)} percent of quote break even)` : 'Cost gate inert: no hardware quote entered', points: costGateShare * w(rules, 'owned', 'costGate', overrides), keep: !hasQuote },
       { label: `Private policy score (${pol.score} pts * factor)`, points: pol.score * w(rules, 'owned', 'privatePolicyFactor', overrides) },
       { label: 'Steady usage pattern', points: state.usagePattern === 'steady' ? w(rules, 'owned', 'steadyUsage', overrides) : 0 },
       { label: 'Operational readiness', points: L(state.opsReadiness) * w(rules, 'owned', 'opsReadiness', overrides) },
@@ -177,8 +193,12 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
   // Hybrid
   {
     const activeWorkloads = ['wlRag', 'wlAgents', 'wlCoding', 'wlAgenticCoding', 'wlModernAgent'].filter((k) => state[k]).length;
+    // Diversity scales with workload count instead of a cliff at 2, so a
+    // second toggled workload does not hand hybrid a large flat bonus
+    // (audit finding: hybrid crowded co-recommendations).
+    const diversityShare = Math.min(Math.max(activeWorkloads - 1, 0), 3) / 3;
     const c = [
-      { label: `Workload diversity (${activeWorkloads} active)`, points: activeWorkloads >= 2 ? w(rules, 'hybrid', 'workloadDiversity', overrides) : 0 },
+      { label: `Workload diversity (${activeWorkloads} active)`, points: diversityShare * w(rules, 'hybrid', 'workloadDiversity', overrides) },
       { label: 'Escalation to premium model', points: (state.escalationPercent ?? 0) > 0 ? w(rules, 'hybrid', 'escalationNeed', overrides) : 0 },
       { label: 'Model routing need', points: L(state.needModelRouting) * w(rules, 'hybrid', 'needModelRouting', overrides) },
       { label: 'Mixed policy posture', points: state.dataCanLeave === 'with-controls' ? w(rules, 'hybrid', 'policyMixed', overrides) : 0 },
@@ -193,7 +213,18 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
 export function checkDoNotSize(state) {
   const missing = [];
   if (!state.dataCanLeave) missing.push('Policy gate: can data leave the customer environment?');
-  if (state.usageVolumeKnown === false || !state.users) missing.push('Usage volume: how many users and runs per day, even roughly?');
+  // Usage is "known" if ANY enabled workload has positive volume drivers,
+  // not only the modern-agent path (audit finding: coding-only scenarios
+  // false-positived on the users gate).
+  const usageKnown = state.usageVolumeKnown !== false && (
+    (state.wlModernAgent && state.users > 0)
+    || (state.wlRag && state.concurrentConnections > 0)
+    || (state.wlAgents && state.workflows > 0)
+    || (state.wlCoding && state.developers > 0)
+    || (state.wlAgenticCoding && state.acDevelopers > 0)
+    || (state.customWorkloadMonthlyTokens ?? 0) > 0
+  );
+  if (!usageKnown) missing.push('Usage volume: how many users, developers, or workflows, even roughly?');
   if (!state.budgetConfidence || state.budgetConfidence === 'unknown') missing.push('Budget confidence: is there any budget signal?');
   return missing;
 }
@@ -246,7 +277,10 @@ export function recommend(state, values, rules, ctx, overrides) {
 /* Spec section 38: confidence model. */
 export function confidence(state, values, ratesInUse = []) {
   const map = { measured: 3, high: 3, medium: 2, estimated: 1.5, low: 1, unknown: 1 };
-  const anyUserRates = ratesInUse.some((r) => r.userSupplied);
+  // Only rates actually assigned to active roles count; the shipped custom
+  // placeholder rows must not permanently cap pricing confidence (audit).
+  const usedPairs = new Set(Object.values(state.roles ?? {}).map((r) => `${r.provider}/${r.tier}`));
+  const anyUserRates = ratesInUse.some((r) => r.userSupplied && usedPairs.has(`${r.providerKey}/${r.tier}`));
   const inputs = [
     ['Usage', state.usageConfidence],
     ['Token estimate', state.tokenEstimateConfidence],

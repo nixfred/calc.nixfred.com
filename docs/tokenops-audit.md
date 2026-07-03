@@ -164,6 +164,55 @@ returned 73 findings. Dispositions:
 8. L40S, Dell XE9680L, Supermicro HGX intentionally deferred to release two
    by settled decision 0.4.17; criterion 45.28 superseded.
 
+## Second adversarial round: full math and decision-logic recheck (2026-07-03)
+
+Fred ordered a fan-out recheck of all calculations and the logic behind each
+decision. Nineteen agents: seven expert lenses (numeric end-to-end with
+independent hand derivations, formulas vs spec, economics, dimensional
+analysis, route-weight rationale across six customer personas, decision
+logic, data integrity), then a skeptic refute pass that re-ran every
+critical/major finding's reproduction before it counted.
+
+Headline: ALL SEVEN LENSES REPORT THE CORE ARITHMETIC CLEAN. 84 checked-OK
+items; hand derivations matched execution to IEEE epsilon across three full
+scenarios, 54 route scores, and 10 dimensional spot checks. The section 46
+anchors reproduce exactly from shipped defaults.
+
+Six findings survived the refute pass, all in the display and edge layer,
+all fixed and regression-tested:
+
+1. The mini-tier optimization lever could report phantom savings equal to
+   the entire worker spend when the target tier had no price. Now advisory
+   with zero dollars until a price exists.
+2. The break-even chart and whiteboard card used a different token basis
+   than the break-even math, so the displayed sentence failed its own
+   arithmetic when quick workloads were on. Both now use the billed basis
+   and the actual monthly budget; a test asserts costPerMillion times
+   breakEven equals the budget exactly.
+3. and 5. Hybrid's routeFlexibility weight was likert-scaled in scoring but
+   counted as a boolean in the normalization max, letting hybrid raw exceed
+   its own maximum. Kind table fixed; exclusive weight pairs (Kamiwaza hard
+   vs soft private execution) now count once.
+4. Hybrid's flat boolean bonuses crowded co-recommendations; diversity now
+   scales with workload count and policyMixed default lowered 15 to 10
+   (weights remain pending Fred's review).
+6. A role routed to an unpriced provider was dropped from cost silently
+   while its tokens stayed in the denominators. Unpriced roles now surface
+   as a visible caution and billedTokens counts priced roles only.
+
+Also fixed from the minor pool: substitution parentheses under batch plus
+uplift, clamped threshold display, vectorRecords null propagation, replan
+attribution trace text, bytesPerVectorRecord wired as a real input,
+embedding-price-missing warnings, ceiling baseline disclosure, pricing
+confidence keyed to rates actually in use, do-not-size usage gate accepting
+non-agent workloads, Azure Global Batch multiplier, benchmark
+precision-comparability notes, Airia strict-private penalty raised per the
+persona audit. Six claims were REFUTED by the skeptic pass and correctly
+left alone. Remaining documented deviations: tool schema overhead billed on
+planning/summary calls (stated as an assumption on the trace), Groq/Together/
+Lambda rows deferred to release two by decision 0.3.9, defaults pre-answer
+the do-not-size gates by design (they form the QA scenario).
+
 ## How to re-run the audit
 
 1. `bun test` for the math contract.
