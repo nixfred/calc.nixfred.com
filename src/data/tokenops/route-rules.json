@@ -1,5 +1,5 @@
 {
-  "comment": "Route scoring weights. DRAFT authored by Larry 2026-07-03, pending Fred's line-by-line review (decision 0.2.6). Each weight has default, min, max; the UI exposes a slider across that range. Factors are 0-3 Likert inputs unless noted. Scores normalize to 0-100 against each route's maximum possible raw score.",
+  "comment": "Route scoring weights. Drafted by Larry, REVIEWED AND SIGNED OFF line-by-line by Fred on 2026-07-03 (persona outcomes + 8 judgment calls confirmed: policy pecking order, direct 0.6 penalty, rent-before-buy posture, quote-gated owned bar, Airia strict penalty 32, HPE preference steering 12/6, BTG dominance, co-recommend margin 10). Each weight has default/min/max; the UI exposes sliders across every range including policy points and the margin. Scores normalize to 0-100 against each route's live maximum.",
   "policyPoints": {
     "dataCannotLeave": {
       "default": 30,

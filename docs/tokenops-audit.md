@@ -67,7 +67,7 @@ not machine-checkable), PENDING.
 3. PASS-I Provenance sanitized: no public file names the internal foundation tool or the employer; heuristics labeled "field sizing heuristic" pointing at docs/tokenops.md. Verified by grep in the compliance audit.
 4. PASS All four platform routes named with public links (e2e).
 5. PASS Scores normalized 0-100 (e2e range assertion).
-6. PASS Weight map drafted in route-rules.json with default/min/max; UI sliders live-reorder routes (e2e counts > 20 sliders). PENDING Fred's line-by-line weight review.
+6. PASS Weight map drafted in route-rules.json with default/min/max; UI sliders live-reorder routes (e2e counts > 20 sliders). REVIEWED AND SIGNED OFF by Fred 2026-07-03: persona outcomes plus eight judgment calls confirmed.
 7. PASS Co-recommend within 10 points ("Two viable routes" path; margin in route-rules.json).
 8. PASS Do-not-size fires on missing critical gates (unit + e2e).
 9. PASS Big five providers seeded plus custom rows (provider-rates.json).

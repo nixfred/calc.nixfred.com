@@ -254,6 +254,25 @@ export function whiteboardCard(data) {
 }
 
 export function weightSliders(rules, overrides) {
+  // Policy gate points: the private-pressure engine, draggable like the rest
+  // (Fred's call during the weight review, 2026-07-03).
+  const policyRows = Object.entries(rules.policyPoints).map(([pk, def]) => {
+    const cur = overrides[`policy.${pk}`] ?? def.default;
+    return `<label class="slider-row">
+      <span class="slider-label">${esc(pk)}${def.note ? ` <span class="dim">(${esc(def.note)})</span>` : ''}</span>
+      <input type="range" min="${def.min}" max="${def.max}" step="1" value="${cur}" data-weight="policy.${esc(pk)}" aria-label="policy ${esc(pk)} points">
+      <span class="mono slider-val">${cur}</span>
+      <span class="dim mono">default ${def.default}</span>
+    </label>`;
+  }).join('');
+  const marginDef = rules.coRecommendMarginPoints;
+  const marginCur = overrides['coRecommendMarginPoints'] ?? marginDef.default;
+  const marginRow = `<label class="slider-row">
+    <span class="slider-label">co-recommend margin <span class="dim">(routes within this many points tie)</span></span>
+    <input type="range" min="${marginDef.min}" max="${marginDef.max}" step="1" value="${marginCur}" data-weight="coRecommendMarginPoints" aria-label="co-recommend margin points">
+    <span class="mono slider-val">${marginCur}</span>
+    <span class="dim mono">default ${marginDef.default}</span>
+  </label>`;
   const groups = Object.entries(rules.routes).map(([rk, r]) => {
     const rows = Object.entries({ ...(r.weights ?? {}), ...(r.penalties ?? {}) }).map(([wk, def]) => {
       const cur = overrides[`${rk}.${wk}`] ?? def.default;
@@ -270,6 +289,8 @@ export function weightSliders(rules, overrides) {
   return `<div class="card" id="weights-panel">
     <h3 class="card-title">Scoring weights</h3>
     <p class="dim">Every weight behind the route scores, slidable within its reviewed range. Move a slider and watch the routes reorder. Reset restores the reviewed defaults.</p>
+    <details class="weight-group"><summary>Policy gate points (private pressure)</summary>${policyRows}</details>
+    <details class="weight-group"><summary>Co-recommend margin</summary>${marginRow}</details>
     ${groups}
     <button id="reset-weights">reset weights to reviewed defaults</button>
   </div>`;
