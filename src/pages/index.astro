@@ -66,4 +66,59 @@ import calculators from '../data/calculators.json';
       <li>Rough math, visible assumptions, formulas public in the source. Never a quote.</li>
     </ol>
   </section>
+
+  <section class="feedback">
+    <p class="section-label">feedback</p>
+    <form id="feedback-form" autocomplete="off">
+      <div class="fb-row">
+        <span class="fb-q">Useful?</span>
+        <button type="button" class="fb-chip" data-useful="1">yes</button>
+        <button type="button" class="fb-chip" data-useful="0">no</button>
+      </div>
+      <label class="fb-label" for="fb-message">What calculator should exist next, or what is wrong with this one?</label>
+      <textarea id="fb-message" maxlength="2000" rows="3"></textarea>
+      <div class="fb-row">
+        <input id="fb-contact" type="text" maxlength="200" placeholder="contact (optional)">
+        <input id="fb-website" type="text" name="website" tabindex="-1" aria-hidden="true" class="fb-hp">
+        <button type="submit" class="fb-send">send</button>
+      </div>
+      <p id="fb-status" class="hint" role="status"></p>
+    </form>
+  </section>
+
+  <script>
+    const form = document.getElementById('feedback-form') as HTMLFormElement;
+    const status = document.getElementById('fb-status')!;
+    let useful: boolean | null = null;
+    form.querySelectorAll<HTMLButtonElement>('.fb-chip').forEach((b) => {
+      b.addEventListener('click', () => {
+        useful = b.dataset.useful === '1';
+        form.querySelectorAll('.fb-chip').forEach((x) => x.classList.toggle('on', x === b));
+      });
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = (document.getElementById('fb-message') as HTMLTextAreaElement).value.trim();
+      if (useful === null && !message) { status.textContent = 'Pick yes or no, or say something.'; return; }
+      status.textContent = 'sending...';
+      try {
+        const r = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            calculator: 'landing',
+            useful,
+            message,
+            contact: (document.getElementById('fb-contact') as HTMLInputElement).value.trim(),
+            website: (document.getElementById('fb-website') as HTMLInputElement).value,
+          }),
+        });
+        const out = await r.json();
+        status.textContent = r.ok && out.ok ? 'Received. Thank you.' : (out.error ?? 'Something broke. Loudly.');
+        if (r.ok && out.ok) form.reset();
+      } catch {
+        status.textContent = 'Network error. The feedback stayed with you.';
+      }
+    });
+  </script>
 </Base>

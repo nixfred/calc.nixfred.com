@@ -285,6 +285,35 @@ a:hover { color: var(--accent-soft); text-decoration: underline; }
 }
 .about li::marker { color: var(--accent); font-family: var(--font-mono); }
 
+/* ---------- feedback ---------- */
+
+.feedback {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 1.25rem 3.5rem;
+  width: 100%;
+}
+.feedback form { display: flex; flex-direction: column; gap: 0.7rem; max-width: 34rem; }
+.fb-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.fb-q { color: var(--muted); font-size: 0.9rem; }
+.fb-chip, .fb-send {
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 6px; padding: 0.35rem 0.9rem; font: inherit; font-size: 0.85rem;
+  font-family: var(--font-mono); cursor: pointer;
+}
+.fb-chip.on { color: var(--accent); border-color: var(--accent); }
+.fb-send { color: var(--accent-soft); border-color: var(--border-bright); }
+.fb-send:hover, .fb-chip:hover { border-color: var(--accent); }
+.fb-label { font-size: 0.85rem; color: var(--muted); }
+.feedback textarea, .feedback input[type="text"] {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font: inherit; font-size: 0.9rem; padding: 0.5rem 0.7rem; width: 100%;
+}
+.feedback input[type="text"] { max-width: 16rem; }
+.feedback textarea:focus, .feedback input:focus { outline: none; border-color: var(--accent); }
+.fb-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.hint { font-size: 0.78rem; color: var(--faint); margin: 0; }
+
 /* ---------- footer ---------- */
 
 .site-footer {
