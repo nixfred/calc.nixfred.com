@@ -62,8 +62,9 @@ A calculator that produces only a number is not done.
 
 ## Structure contract
 
-1. Sticky header: `calc.nixfred.com` in mono left, property links right
-   (nixfred.com, youtube, source), back to list when inside a calculator.
+1. Sticky header: `calc.nixfred.com` in mono left, links right
+   (nixfred.com and source ONLY, no youtube, Fred removed it 2026-07-03),
+   back to list when inside a calculator.
 2. Hero: "Math you can whiteboard." plus a two sentence factual pitch.
    No storytelling, no scene setting. Fred's call on 2026-07-02:
    "just the facts, let the calcs do the work."
