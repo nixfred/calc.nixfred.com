@@ -3,13 +3,22 @@ import Base from '../../layouts/Base.astro';
 import '../../styles/tokenops.css';
 ---
 <Base
-  title="How to use TokenOps - calc.nixfred.com"
+  title="How to use TokenOps · calc.nixfred.com"
   description="The long-form field manual for TokenOps: what every input means, how to read the recommendation, and how to run it live in a Customer meeting."
 >
   <main class="tokenops-main">
     <div class="wizard" style="max-width: 46rem;">
       <h1>How to use TokenOps</h1>
       <p class="dim">The field manual. Ten minutes to read, then the tool takes ninety seconds in a room. <a href="/tokenops">Open TokenOps</a>.</p>
+
+      <div class="card">
+        <h3 class="card-title">TLDR</h3>
+        <ol>
+          <li>Click "In a meeting", pick a preset, fix users and adoption, answer the policy gate, read the answer out loud.</li>
+          <li>The big dollar figure is the ceiling a hardware quote must come UNDER to beat tokens. Type a real quote for an instant verdict.</li>
+          <li>Everything is a range or a score with its rules showing. Nothing here is a quote.</li>
+        </ol>
+      </div>
 
       <div class="card">
         <h3 class="card-title">1. What this is and when to open it</h3>
@@ -21,7 +30,9 @@ import '../../styles/tokenops.css';
           <li>"Can we run this ourselves? Our data cannot leave."</li>
           <li>"Which platform should we build the agents on?"</li>
         </ol>
-        <p>It is a conversation tool. It is never a quote, and it says so on every surface.</p>
+        <p>It is for the architect or seller running the conversation, in front of the Customer or preparing for one. It is a conversation tool. It is never a quote, and it says so on every surface.</p>
+        <p>The spine of the whole tool is one equation, worth memorizing for the hostile-architect moment: <span class="mono">monthly cost = users x adoption x runs per day x days x calls per run x (input tokens x input rate + output tokens x output rate)</span>, cache adjusted. Every screen in the tool is that equation with receipts attached.</p>
+        <p>The five providers priced at public list rates: Anthropic, OpenAI, Google Gemini, Azure OpenAI, and AWS Bedrock, three model tiers each, every cell editable.</p>
       </div>
 
       <div class="card">
@@ -29,27 +40,27 @@ import '../../styles/tokenops.css';
         <p>The tool opens with two buttons. Pick by how much time the room has.</p>
         <ol>
           <li><strong>In a meeting</strong>: a four-step wizard, about twelve inputs, two minutes to a defensible answer. Use this with a Customer watching.</li>
-          <li><strong>Deep sizing</strong>: every section, every formula, every assumption on one scrolling page. Use this at your desk, before the proposal, or when an engineer wants to argue. Arguing is encouraged; the math is on screen.</li>
+          <li><strong>Deep sizing</strong> (the tool calls this full view Architect Mode): every section, every formula, every assumption on one scrolling page. Use this at your desk, before the proposal, or when an engineer wants to argue. Arguing is encouraged; the math is on screen.</li>
         </ol>
-        <p>There is also a preset dropdown on the chooser. Starting from a preset (Customer support pilot, RAG assistant, agentic coding swarm, regulated private assistant, and more) fills every input with a coherent scenario you then bend toward reality.</p>
+        <p>There is also a preset dropdown on the chooser. Starting from a preset (Customer support agent pilot, Simple RAG assistant, Agentic coding swarm, Private regulated assistant, and more) fills every input with a coherent scenario you then bend toward reality.</p>
       </div>
 
       <div class="card">
         <h3 class="card-title">3. Meeting Mode, step by step</h3>
-        <p><strong>Step 1, the use case.</strong> Name the scenario, pick the Customer size, and answer the budget signal honestly. Budget matters more than it looks: if it stays Unknown, the tool will refuse to recommend a route and tell you to go do discovery instead. That refusal is a feature.</p>
-        <p><strong>Step 2, scale.</strong> Users, runs per user per day, adoption percent. Adoption is the one everybody overestimates. Fifty percent adoption of the licensed population is a realistic pilot; type what you believe, not what the sponsor hopes. Days per month appears once users are entered.</p>
+        <p><strong>Step 1, the use case.</strong> Name the scenario, pick the Customer size, and answer the budget signal honestly (Unknown, Weak, Some budget, or Committed). Budget matters more than it looks: only Unknown trips the guard, but if it stays Unknown the tool will refuse to recommend a route and tell you to go do discovery instead. That refusal is a feature.</p>
+        <p><strong>Step 2, scale.</strong> Users, runs per user per day, adoption percent. Adoption is the one everybody overestimates. Fifty percent adoption of the licensed population is a realistic pilot; type what you believe, not what the sponsor hopes. Days per month shows whenever a user count is present, and hides if you clear Users.</p>
         <p><strong>Step 3, the policy gate.</strong> Can data leave the environment: Yes, With controls, or No. This single answer moves more scoring weight than anything else in the tool. Answer No and the private routes surge while public providers take a visible penalty. Follow-up questions reveal themselves based on your answer.</p>
-        <p><strong>Step 4, workload shape.</strong> Pick the agent topology (single assistant up to swarm), the prompt cache hit rate, and the retry rate. Topology is the silent cost multiplier: a planner-worker-judge shape makes about eight model calls per run where a single assistant makes one. The tool shows that math rather than hiding it.</p>
+        <p><strong>Step 4, workload shape.</strong> Pick the agent topology (single assistant up to swarm), the prompt cache hit rate, and the retry rate. Cache matters because providers bill a cached input re-read at roughly a tenth of the normal input rate, so a stable system prompt is real money. Topology is the silent cost multiplier: a planner-worker-judge shape makes about eight model calls per run where a single assistant makes one. The tool shows that math rather than hiding it.</p>
         <p>Then the answer page: recommendation, budget ceiling, provider costs, whiteboard card, and discovery questions, all live. Every number updates if you go back and change an input.</p>
       </div>
 
       <div class="card">
         <h3 class="card-title">4. Deep sizing: the sections that matter most</h3>
-        <p>Architect Mode shows sixteen sections. All of them work; four of them decide the answer.</p>
+        <p>Architect Mode shows sixteen sections, five of which appear only when the modern agent workload is switched on. All of them work; four of them decide the answer.</p>
         <ol>
           <li><strong>Agent topology.</strong> Calls per run by role: planners, workers, judges, retries, replans. If you only tune one section after a preset, tune this one to match how the Customer's agent will actually be built.</li>
-          <li><strong>Token anatomy per role.</strong> Input and output tokens per call for each role, plus the cached input percent. Output tokens cost three to five times input tokens at every provider, so the output columns are where money hides.</li>
-          <li><strong>Data and policy gate.</strong> Twenty yes-no questions that build the private policy score. The score and its arithmetic render right below the section.</li>
+          <li><strong>Token anatomy per role.</strong> Input and output tokens per call for each role, plus the cached input percent. Output tokens cost five to six times input tokens at every shipped provider rate, so the output columns are where money hides.</li>
+          <li><strong>Data and policy gate.</strong> Fifteen policy questions. Seven weighted conditions among them build the private policy score, and the score with its arithmetic renders right below the section.</li>
           <li><strong>Economics and the ceiling.</strong> The savings threshold (default: owned must beat tokens by 40 percent), the amortization window, and the quote slot.</li>
         </ol>
         <p>The other sections (RAG, tools, memory, context snowball, sizing, storage, network) add realism when the conversation goes there. Every one renders its formulas inline, always expanded.</p>
@@ -58,7 +69,7 @@ import '../../styles/tokenops.css';
       <div class="card">
         <h3 class="card-title">5. Reading the recommendation card</h3>
         <ol>
-          <li><strong>Route scores, 0 to 100.</strong> Nine routes from direct provider to owned hardware, each scored by visible weighted rules. The bars are comparable at a glance; the "rules that fired" list below them is your talking track.</li>
+          <li><strong>Route scores, 0 to 100.</strong> Nine routes, each scored by visible weighted rules: direct provider, cloud model service, Airia, Kamiwaza, Build Technology Group, HPE Private Cloud AI, rented GPU validation, owned hardware, and hybrid. The bars are comparable at a glance; the "rules that fired" list below them is your talking track.</li>
           <li><strong>Two viable routes.</strong> When the top two land within ten points, the tool refuses to fake certainty and presents both with the tradeoff stated. Read that line to the Customer verbatim; it starts the right conversation.</li>
           <li><strong>Do not size yet.</strong> If the policy gate, usage volume, or budget signal is missing, this beats every route and lists exactly what discovery is owed. Do not fight it. It is right.</li>
           <li><strong>Missing data, primary risk, primary lever.</strong> Every recommendation names what would change it: no quote entered, no measured benchmark, estimated usage. Confidence shows High, Medium, or Low with the averaging math printed under it.</li>
