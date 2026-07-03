@@ -1,0 +1,14 @@
+# Local planning docs, never public
+02_calculators_nixfred.md
+Plans/
+
+# Build artifacts
+dist/
+.astro/
+node_modules/
+.wrangler/
+.DS_Store
+
+# Screenshots and playwright artifacts
+*.png
+.playwright-mcp/
