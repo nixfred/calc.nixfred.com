@@ -28,6 +28,11 @@ jobs:
 
   deploy:
     needs: audit
+    # Deploys are manual (local wrangler) until a Pages-scoped API token is
+    # added to repo secrets. Flip the CF_DEPLOY repo variable to 'enabled'
+    # after adding CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID secrets.
+    # Skipped (not failed) runs send no failure emails.
+    if: ${{ vars.CF_DEPLOY == 'enabled' }}
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
