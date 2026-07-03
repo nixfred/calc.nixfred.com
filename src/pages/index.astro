@@ -22,22 +22,37 @@ import calculators from '../data/calculators.json';
     <ul class="calc-list">
       {calculators.map((c) => (
         <li class={`calc-card ${c.status}`}>
-          <div class="calc-top">
-            <span class="calc-index mono">[{c.index}]</span>
-            {c.status === 'live'
-              ? <h2 class="calc-title"><a href={`/${c.slug}`} data-scramble-hover>{c.title}</a></h2>
-              : <h2 class="calc-title" data-scramble-hover>{c.title}</h2>}
-            <span class={`badge ${c.status === 'live' ? 'live-badge' : ''}`}>
-              {c.status === 'live' ? 'LIVE' : 'QUEUED'}
-            </span>
-          </div>
-          <p class="calc-desc">{c.oneLiner}</p>
-          <div class="calc-meta">
-            <span>{c.inputs} inputs &rarr; {c.outputs} outputs</span>
-            <span class="tags">
-              {c.tags.map((t) => <span class="tag">{t}</span>)}
-            </span>
-          </div>
+          {c.status === 'live' ? (
+            <a class="card-link" href={`/${c.slug}`} aria-label={`Open ${c.title}`}>
+              <div class="calc-top">
+                <span class="calc-index mono">[{c.index}]</span>
+                <h2 class="calc-title" data-scramble-hover>{c.title}</h2>
+                <span class="badge live-badge">LIVE</span>
+              </div>
+              <p class="calc-desc">{c.oneLiner}</p>
+              <div class="calc-meta">
+                <span>{c.inputs} inputs &rarr; {c.outputs} outputs</span>
+                <span class="tags">
+                  {c.tags.map((t) => <span class="tag">{t}</span>)}
+                </span>
+              </div>
+            </a>
+          ) : (
+            <>
+              <div class="calc-top">
+                <span class="calc-index mono">[{c.index}]</span>
+                <h2 class="calc-title" data-scramble-hover>{c.title}</h2>
+                <span class="badge">QUEUED</span>
+              </div>
+              <p class="calc-desc">{c.oneLiner}</p>
+              <div class="calc-meta">
+                <span>{c.inputs} inputs &rarr; {c.outputs} outputs</span>
+                <span class="tags">
+                  {c.tags.map((t) => <span class="tag">{t}</span>)}
+                </span>
+              </div>
+            </>
+          )}
         </li>
       ))}
     </ul>

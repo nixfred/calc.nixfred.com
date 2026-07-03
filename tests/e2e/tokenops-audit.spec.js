@@ -272,10 +272,17 @@ test.describe('Section 0 settled decisions', () => {
     expect(errs).toContain('activeHoursPerDay');
   });
 
-  test('landing page lists TokenOps as LIVE with a working link', async ({ page }) => {
+  test('landing page: TokenOps LIVE and the ENTIRE card is clickable (Fred standard 2026-07-03)', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.calc-card.live .calc-title a')).toHaveAttribute('href', '/tokenops');
-    await page.goto('/tokenops');
+    const link = page.locator('.calc-card.live a.card-link');
+    await expect(link).toHaveAttribute('href', '/tokenops');
+    // The link must wrap the whole card content: title, description, and meta.
+    await expect(link.locator('.calc-title')).toBeVisible();
+    await expect(link.locator('.calc-desc')).toBeVisible();
+    await expect(link.locator('.calc-meta')).toBeVisible();
+    // Clicking the description (not the title) must navigate.
+    await link.locator('.calc-desc').click();
+    await expect(page).toHaveURL(/\/tokenops\/?$/);
     await expect(page.locator('#tokenops-root')).toBeVisible();
   });
 });

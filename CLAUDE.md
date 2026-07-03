@@ -49,11 +49,15 @@ A calculator that produces only a number is not done.
 7. Screenshot friendly: every result card must look good in a screenshot
    and a screen share.
 
-## Signature interaction: decode
+## Signature interaction: decode on the landing, build-in inside tools
 
-1. Page and view transitions use the decode/descramble effect: text starts
-   as glyph noise and resolves left to right in about 400ms.
-2. Calculator titles re-scramble briefly on hover.
+1. The decode/descramble effect (glyph noise resolving left to right) is
+   the LANDING PAGE signature only: hero decode on load, title scramble on
+   hover. Fred's call 2026-07-03: NO glyph scrambling inside calculators,
+   it is too much in a working tool.
+2. Inside calculators, view changes use a staggered build-in instead:
+   sections and cards rise/fade in with ~45ms stagger (the `rise` class).
+   Dynamic build feel, quiet execution.
 3. Inputs are usable immediately. Animation never blocks interaction.
 4. `prefers-reduced-motion` disables all of it.
 5. Navigation into a calculator must FEEL in place, not like a page change,
@@ -72,6 +76,9 @@ A calculator that produces only a number is not done.
 4. Each card shows: index, title, ONE LINE description,
    input/output counts in mono, tag chips, LIVE or QUEUED badge.
    No audience lines, no paragraphs. One line means one line.
+   LIVE cards are clickable across their ENTIRE surface (one card-link
+   anchor wrapping the card content), not just the title. This is the
+   standard for every calculator, settled by Fred 2026-07-03.
 5. Only the next 2 or 3 unbuilt calculators appear as QUEUED. Never the
    whole roadmap.
 6. Three line about block under the list.

@@ -176,10 +176,22 @@ a:hover { color: var(--accent-soft); text-decoration: underline; }
 }
 
 .calc-card.queued { opacity: 0.62; }
+.calc-card.live { padding: 0; }
 .calc-card.live:hover {
-  border-color: var(--border-bright);
+  border-color: var(--accent);
   transform: translateY(-1px);
 }
+/* Whole card is the link. Standard for every live calculator. */
+.card-link {
+  display: block;
+  padding: 1.45rem 1.5rem 1.3rem;
+  color: inherit;
+  border-radius: 10px;
+}
+.card-link:hover { text-decoration: none; color: inherit; }
+.card-link:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.35); }
+.card-link .calc-title { color: var(--text); }
+.card-link:hover .calc-title { color: var(--accent-soft); }
 
 .calc-top {
   display: flex;
