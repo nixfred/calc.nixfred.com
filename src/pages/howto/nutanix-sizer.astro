@@ -3,7 +3,7 @@ import Base from '../../layouts/Base.astro';
 import '../../styles/tokenops.css';
 ---
 <Base
-  title="How to use the Nutanix Conversation Sizer - calc.nixfred.com"
+  title="How to use the Nutanix Conversation Sizer · calc.nixfred.com"
   description="The long-form field manual for the Nutanix Conversation Sizer: every input explained, how the node range is built, and how to run it in a live Customer conversation."
 >
   <main class="tokenops-main">
@@ -13,7 +13,7 @@ import '../../styles/tokenops.css';
 
       <div class="card">
         <h3 class="card-title">1. What this is and when to open it</h3>
-        <p>The sizer turns a VM estate into an honest <strong>node count range</strong> during a live conversation: raw-to-usable storage math, the CVM tax paid up front, realistic ceilings, and a failure reserve, in about sixty seconds of typing.</p>
+        <p>The sizer turns a VM estate into an honest <strong>node count range</strong> during a live conversation: raw-to-usable storage math, the Controller VM (CVM) tax paid up front, realistic ceilings, and a failure reserve, in about sixty seconds of typing. It is for the architect or seller running the conversation, in front of the Customer or preparing for one.</p>
         <p>Open it when you hear:</p>
         <ol>
           <li>"Roughly how many nodes would our environment need?"</li>
@@ -31,12 +31,13 @@ import '../../styles/tokenops.css';
         <p><strong>Growth.</strong> Annual percent and the sizing window, default 24 months. The guide's rule: size for 18 to 24 months of growth, then plan to add nodes. Sizing for five years buys idle hardware; sizing for today fills the cluster the day the growth arrives.</p>
         <p><strong>Data protection.</strong> RF2, RF3, or erasure coding. This is the biggest storage lever in the tool:</p>
         <ol>
+          <li>First, the mechanism: RF2 keeps two full copies of every write and RF3 keeps three, while erasure coding stripes data with parity blocks instead of full copies, which is why its usable percentage is higher.</li>
           <li>RF2: 50 percent of raw is usable, tolerates one node failure, three-node minimum. The default answer for most estates.</li>
-          <li>RF3: 33 percent usable, tolerates two simultaneous failures, five-node minimum. Costs a third more raw capacity than RF2, so make the Customer earn it: what are the actual RTO and RPO requirements, and what does the backup layer already cover?</li>
+          <li>RF3: 33 percent usable, tolerates two simultaneous failures, five-node minimum. Storing a third copy means the same data needs about 50 percent more raw capacity than RF2 (equivalently, a third less usable per raw TB), so make the Customer earn it: what are the actual RTO and RPO requirements, and what does the backup layer already cover?</li>
           <li>EC-X 4+1 and 4+2: 80 and 67 percent usable, for cold and archival data, with six and seven node minimums. Not for hot latency-sensitive workloads.</li>
         </ol>
-        <p><strong>The CVM profile.</strong> Light (8 vCPU / 32 GB), Standard (12 / 48), Heavy (16 / 64). This is the storage controller running on every node, and the tool subtracts it from usable resources before a single guest VM lands. When a competitor calls it overhead, the honest answer is yes, and here it is with numbers.</p>
-        <p><strong>The node profile.</strong> Cores, RAM, raw TB per node. The default is a middle-of-the-road box; type the actual hardware model under discussion for a sharper range.</p>
+        <p><strong>The CVM profile.</strong> Light (8 vCPU / 32 GB), Standard (12 / 48), Heavy (16 / 64). The Controller VM is the storage controller running on every node, and the tool subtracts it from usable resources before a single guest VM lands. When a competitor calls it overhead, the honest answer is yes, and here it is with numbers.</p>
+        <p><strong>The node profile.</strong> Cores, RAM, raw TB per node. The default is a middle-of-the-road box (32 cores, 768 GB, 30.72 TB raw). Type the actual hardware model under discussion for a sharper range. Two more defaults an architect may probe: the platform capacity reservation is set to 12 percent (the guide says 10 to 15), and the honest-range band is 25 percent, both editable in the formula cards.</p>
         <p><strong>The ratios.</strong> Compression, dedup, and vCPU-to-pCPU. The efficiency defaults come from the guide's planning ranges (and the guide is blunt: never quote marketing 4 to 6x compression). The overcommit ratios are field heuristics, 4:1 general and 2:1 database, labeled as such because the guide deliberately publishes none.</p>
       </div>
 
