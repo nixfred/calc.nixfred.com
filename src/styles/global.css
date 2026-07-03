@@ -1,5 +1,5 @@
 /* calc.nixfred.com global styles
-   Contract: dark only, BlueAlly-adjacent blues, sans text + mono numbers,
+   Contract: dark only, deep blues on near black, sans text + mono numbers,
    gradient glow behind hero, breathing room, text glyphs only. */
 
 :root {
@@ -10,7 +10,8 @@
   --border-bright: #2c4370;
   --text: #dce5f4;
   --muted: #8598ba;
-  --faint: #5a6c8f;
+  --faint: #7487ab; /* WCAG AA on bg, surface, and surface-2 (audit finding) */
+  --header-h: 3.15rem;
   --accent: #4da3ff;
   --accent-soft: #8ec5ff;
   --glow: rgba(45, 110, 220, 0.22);

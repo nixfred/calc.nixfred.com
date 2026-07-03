@@ -12,3 +12,12 @@ node_modules/
 # Screenshots and playwright artifacts
 *.png
 .playwright-mcp/
+
+# TokenOps spec + BlueAlly foundation material, never public
+18_tokenops_transparent_math_full_build_spec.md
+GenAI Inferencing*
+*.html
+!src/**/*.html
+test-results/
+playwright-report/
+shots/

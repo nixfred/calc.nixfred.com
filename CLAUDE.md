@@ -35,7 +35,7 @@ A calculator that produces only a number is not done.
 ## Visual contract
 
 1. Dark only. No light mode, no toggle.
-2. Palette: BlueAlly adjacent blues on near black. Tokens live in
+2. Palette: deep enterprise blues on near black. Tokens live in
    `src/styles/global.css` (`--bg #070b14`, `--accent #4da3ff`, etc).
    Use the tokens, never new hex values.
 3. Typography: sans for headers and body, mono for numbers, metadata,

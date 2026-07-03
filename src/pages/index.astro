@@ -24,7 +24,9 @@ import calculators from '../data/calculators.json';
         <li class={`calc-card ${c.status}`}>
           <div class="calc-top">
             <span class="calc-index mono">[{c.index}]</span>
-            <h2 class="calc-title" data-scramble-hover>{c.title}</h2>
+            {c.status === 'live'
+              ? <h2 class="calc-title"><a href={`/${c.slug}`} data-scramble-hover>{c.title}</a></h2>
+              : <h2 class="calc-title" data-scramble-hover>{c.title}</h2>}
             <span class={`badge ${c.status === 'live' ? 'live-badge' : ''}`}>
               {c.status === 'live' ? 'LIVE' : 'QUEUED'}
             </span>

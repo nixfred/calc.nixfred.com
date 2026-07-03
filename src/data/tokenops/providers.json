@@ -1,0 +1,8 @@
+{
+  "anthropic": { "label": "Anthropic", "sourceId": "anthropic_pricing" },
+  "openai": { "label": "OpenAI", "sourceId": "openai_api_pricing" },
+  "gemini": { "label": "Google Gemini", "sourceId": "gemini_api_pricing" },
+  "azure_openai": { "label": "Azure OpenAI", "sourceId": "azure_openai_pricing" },
+  "bedrock": { "label": "AWS Bedrock", "sourceId": "aws_bedrock_pricing" },
+  "custom": { "label": "Custom / negotiated", "sourceId": null }
+}

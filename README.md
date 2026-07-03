@@ -9,6 +9,13 @@ Interactive decision tools built for live customer meetings, not for
 spreadsheets. Renewal triage, POC readiness, rough sizing, AI application
 readiness, and whatever the field demands next.
 
+Live now: **[TokenOps](https://calc.nixfred.com/tokenops)**, an AI workload
+placement and token economics calculator. Transparent math throughout: every
+number shows its formula, variables, live substitution, assumptions, and
+sources. Methodology in [docs/tokenops.md](docs/tokenops.md), completion audit
+in [docs/tokenops-audit.md](docs/tokenops-audit.md), regression harness in
+`tests/`.
+
 Every calculator returns four things:
 
 1. A customer friendly answer.
