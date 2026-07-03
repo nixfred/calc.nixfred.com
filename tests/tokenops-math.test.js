@@ -122,7 +122,11 @@ test('owned-hardware cost gate is inert without a quote (self-reference audit fi
   const { values } = engine.evaluate(state, {});
   const noQuote = scoreRoutes({ ...state, gpuQuote: null }, values, rules, { providerMonthlyCost: 5000, usageVersusBreakEven: 1.67 }, {});
   const owned = noQuote.routes.find((r) => r.key === 'owned');
-  expect(owned.components.find((c) => c.label.includes('Cost gate'))).toBeUndefined();
+  // The gate contributes ZERO points and its inert label stays visible so
+  // the user knows why (display fix from the second audit round).
+  const gate = owned.components.find((c) => c.label.includes('Cost gate'));
+  expect(gate.points).toBe(0);
+  expect(gate.label).toContain('inert');
   const withQuote = scoreRoutes({ ...state, gpuQuote: 50000 }, values, rules, { providerMonthlyCost: 5000, usageVersusBreakEven: 1.2 }, {});
   const owned2 = withQuote.routes.find((r) => r.key === 'owned');
   expect(owned2.components.some((c) => c.label.includes('Cost gate'))).toBe(true);
@@ -213,6 +217,60 @@ test('all three do-not-size gates fire individually (decision 0.2.8)', () => {
 test('audit document exists in the repo (decision 0.8.32)', () => {
   expect(existsSync(new URL('../docs/tokenops-audit.md', import.meta.url).pathname)).toBe(true);
   expect(existsSync(new URL('../docs/tokenops.md', import.meta.url).pathname)).toBe(true);
+});
+
+/* ---------- recheck-round regression tests (2026-07-03 second audit) ---------- */
+
+test('no phantom savings: lever to an unpriced tier is advisory, never a dollar claim', async () => {
+  const { optimizationLevers } = await import('../src/lib/tokenops/costs.js');
+  const localRates = structuredClone(rates);
+  const cw = localRates.find((r) => r.providerKey === 'custom' && r.tier === 'workhorse');
+  cw.inputPerMillion = 2; cw.cachedInputPerMillion = 0.2; cw.outputPerMillion = 10;
+  const s = structuredClone(defaults);
+  s.roles.worker = { ...s.roles.worker, provider: 'custom' }; // priced workhorse, UNPRICED mini
+  const { values } = engine.evaluate(s, {});
+  const { total } = roleRoutedCost(s, values, localRates);
+  const levers = optimizationLevers(s, values, localRates, total, (p) => engine.evaluate(p, {}).values);
+  const miniLever = levers.find((l) => l.label.includes('mini tier'));
+  expect(miniLever.savings).toBe(0);
+  expect(miniLever.substitution).toContain('not computed');
+});
+
+test('break even chart basis: cost-per-million times break-even equals the monthly budget exactly', () => {
+  const s = { ...structuredClone(defaults), wlRag: true }; // quick workload on: the old bug trigger
+  const { values } = engine.evaluate(s, {});
+  const { total, billedTokens } = roleRoutedCost(s, values, rates);
+  const be = breakEvenTokens(s, values, total, billedTokens);
+  expect(be.weightedCostPerMillion * be.result).toBeCloseTo(be.monthlyBudget, 6);
+  // With a quote, the budget must be the amortized quote, not the ceiling.
+  const be2 = breakEvenTokens({ ...s, gpuQuote: 90000 }, values, total, billedTokens);
+  expect(be2.monthlyBudget).toBeCloseTo(90000 / s.usefulLifeMonths, 6);
+});
+
+test('hybrid raw score can never exceed its own theoretical max (routeFlexibility is likert-scaled)', () => {
+  const s = { ...structuredClone(defaults), wlRag: true, wlAgents: true, wlCoding: true, wlAgenticCoding: true, needModelRouting: 3, escalationPercent: 20, dataCanLeave: 'with-controls' };
+  const { values } = engine.evaluate(s, {});
+  const { routes } = scoreRoutes(s, values, rules, { providerMonthlyCost: 5000, usageVersusBreakEven: 0.5 }, {});
+  const hybrid = routes.find((r) => r.key === 'hybrid');
+  expect(hybrid.raw).toBeLessThanOrEqual(hybrid.max);
+  expect(hybrid.score).toBeLessThanOrEqual(100);
+});
+
+test('unpriced role is surfaced, and billedTokens excludes its tokens (no silent dilution)', () => {
+  const s = structuredClone(defaults);
+  s.roles.worker = { ...s.roles.worker, provider: 'custom' }; // custom rows ship unpriced
+  const { values } = engine.evaluate(s, {});
+  const all = roleRoutedCost(structuredClone(defaults), values, rates);
+  const partial = roleRoutedCost(s, values, rates);
+  expect(partial.missingRoles.length).toBe(1);
+  expect(partial.missingRoles[0]).toContain('worker');
+  expect(partial.billedTokens).toBeLessThan(all.billedTokens);
+  expect(partial.total).toBeLessThan(all.total);
+});
+
+test('do-not-size usage gate accepts non-agent workloads (coding-only is known usage)', () => {
+  const s = { ...structuredClone(defaults), wlModernAgent: false, wlCoding: true, developers: 25, users: 0 };
+  expect(checkDoNotSize(s).length).toBe(0);
 });
 
 test('role routed cost prices cached vs uncached correctly (spec 15.1-15.2)', () => {

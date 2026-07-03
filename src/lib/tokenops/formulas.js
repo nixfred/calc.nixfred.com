@@ -271,7 +271,7 @@ defs.push({
     { symbol: 'documentsIndexed', label: 'Documents indexed', value: s.documentsIndexed },
     { symbol: 'chunksPerDocument', label: 'Chunks per document', value: R.chunksPerDocument, source: 'calculated above' },
   ],
-  compute: (v) => v.documentsIndexed * v.chunksPerDocument,
+  compute: (v) => v.chunksPerDocument == null ? null : v.documentsIndexed * v.chunksPerDocument,
   sourceIds: [],
 });
 
@@ -289,6 +289,9 @@ defs.push({
   ],
   compute: (v) => v.monthlyChangedDocTokens + v.queryEmbeddingTokens,
   assumptions: () => ['Each RAG query embeds about 40 tokens of query text.'],
+  warn: (value, v, s) => s.embeddingPricePerMillion == null
+    ? [{ severity: 'info', message: 'No embedding price entered, so these tokens are counted but excluded from provider cost totals until one is set.' }]
+    : [],
   sourceIds: [],
 });
 
@@ -413,13 +416,14 @@ defs.push({
   shortAnswer: 'All prompt-side tokens one run consumes across every role.',
   whyItMatters: 'Input volume dominates most agent bills.',
   plainEnglish: 'sum over roles of calls times input tokens per call, plus tool, memory, and RAG additions, retries included',
-  algebra: 'inputTokensPerRun = sum(roleCalls * callScale * roleInputTokens) + toolTokens + memoryReadTokens + ragTokens',
+  algebra: 'inputTokensPerRun = sum(roleCalls * retryScale * roleInputTokens) + plannerReplans * plannerInputTokens + retryScale * (toolTokens + memoryReadTokens + ragTokens)',
   when: (s) => s.wlModernAgent,
   vars: (s, R) => [
-    { symbol: 'callScale', label: 'Retry and replan scale', value: R.baseCallsPerRun > 0 ? R.totalCallsPerRun / R.baseCallsPerRun : 1, source: 'totalCallsPerRun / baseCallsPerRun' },
+    { symbol: 'retryScale', label: 'Retry scale', value: R.baseCallsPerRun > 0 ? (R.baseCallsPerRun + R.retryCallsPerRun) / R.baseCallsPerRun : 1, source: '(base + retry calls) / base calls' },
+    { symbol: 'plannerReplans', label: 'Planner replan calls', value: R.replanCallsPerRun ?? 0, source: 'replans are planner-only calls (spec 13.5)' },
   ],
   compute: (v, s, R) => roleMonthly(s, R, 'input'),
-  assumptions: (s) => ['Retry and replan calls repeat the same role mix as base calls.',
+  assumptions: (s) => ['Retries repeat the base role mix; replans add PLANNER calls only. Run-level tool, memory, and RAG tokens retry-scale with the calls that produce them.',
     ...ROLE_LIST.filter((r) => roleCallsPerRun(s, r) > 0).map((r) => `${r}: ${roleCallsPerRun(s, r)} calls at ${s.roles[r].inputTokensPerCall.toLocaleString()} input tokens per call.`)],
   sourceIds: [],
 });
@@ -430,10 +434,11 @@ defs.push({
   shortAnswer: 'All completion-side tokens one run produces.',
   whyItMatters: 'Output tokens usually cost 3 to 5 times input tokens.',
   plainEnglish: 'sum over roles of calls times output tokens per call, retries included, plus memory writes',
-  algebra: 'outputTokensPerRun = sum(roleCalls * callScale * roleOutputTokens) + memoryWriteTokens',
+  algebra: 'outputTokensPerRun = sum(roleCalls * retryScale * roleOutputTokens) + plannerReplans * plannerOutputTokens + retryScale * memoryWriteTokens',
   when: (s) => s.wlModernAgent,
   vars: (s, R) => [
-    { symbol: 'callScale', label: 'Retry and replan scale', value: R.baseCallsPerRun > 0 ? R.totalCallsPerRun / R.baseCallsPerRun : 1, source: 'totalCallsPerRun / baseCallsPerRun' },
+    { symbol: 'retryScale', label: 'Retry scale', value: R.baseCallsPerRun > 0 ? (R.baseCallsPerRun + R.retryCallsPerRun) / R.baseCallsPerRun : 1, source: '(base + retry calls) / base calls' },
+    { symbol: 'plannerReplans', label: 'Planner replan calls', value: R.replanCallsPerRun ?? 0, source: 'replans are planner-only calls (spec 13.5)' },
   ],
   compute: (v, s, R) => roleMonthly(s, R, 'output'),
   sourceIds: [],
@@ -832,14 +837,15 @@ defs.push({
   title: 'Vector DB growth (legacy quick)',
   shortAnswer: 'Daily vector store growth from token flow.',
   whyItMatters: 'Continuously indexed content grows storage forever.',
-  plainEnglish: 'daily tokens divided by the 512 token chunk size, times 7,987 bytes per vector record, times the quantization factor, converted to GB',
-  algebra: 'vectorDbLegacyGB = (dailyTokens / 512) * 7987 * kvQuantizationFactor / 1e9',
+  plainEnglish: 'daily tokens divided by the 512 token chunk size, times bytes per vector record, times the quantization factor, converted to GB',
+  algebra: 'vectorDbLegacyGB = (dailyTokens / 512) * bytesPerVectorRecord * kvQuantizationFactor / 1e9',
   vars: (s, R) => [
     { symbol: 'dailyTokens', label: 'Daily tokens', value: (R.totalMonthlyTokens ?? 0) / 30, source: 'total monthly / 30' },
+    { symbol: 'bytesPerVectorRecord', label: 'Bytes per vector record', value: s.bytesPerVectorRecord, editable: true, source: 'field heuristic default 7,987, editable in Storage' },
     { symbol: 'kvQuantizationFactor', label: 'Quantization factor', value: s.kvQuantizationFactor, editable: true },
   ],
-  compute: (v) => (v.dailyTokens / 512) * 7987 * v.kvQuantizationFactor / 1e9,
-  assumptions: () => ['Legacy field heuristic: 512 token chunks, 7,987 bytes per vector record.'],
+  compute: (v) => (v.dailyTokens / 512) * v.bytesPerVectorRecord * v.kvQuantizationFactor / 1e9,
+  assumptions: () => ['Legacy field heuristic: 512 token chunks. Bytes per vector record editable in Storage.'],
   sourceIds: ['field_heuristic'],
 });
 

@@ -139,7 +139,7 @@ export function providerTable(cmp, providerMeta, sources) {
   }).join('');
   return `<div class="card">
     <h3 class="card-title">Provider comparison</h3>
-    <p class="dim">The whole workload priced inside each provider family, role tiering kept. Public list prices, editable in the rates panel. Never a quote.</p>
+    <p class="dim">The AGENT workload priced inside each provider family, role tiering kept. Quick-formula workloads appear in demand totals but are not priced here. Public list prices, editable in the rates panel. Never a quote.</p>
     <div class="table-wrap"><table class="cmp-table">
       <thead><tr><th>provider</th><th>monthly</th><th>per run</th><th>per user</th><th>source</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -194,12 +194,18 @@ export function hardwareCards(hardware, state, sources) {
     <div class="hw-grid">${cards}</div></div>`;
 }
 
-/* Break even chart: inline SVG, no dependencies. */
-export function breakEvenChart(be, ceilingMonthly, providerMonthlyCost, totalMTok) {
-  if (!be?.result || !providerMonthlyCost) return '<p class="dim">Chart appears once token volume and provider cost exist.</p>';
+/* Break even chart: inline SVG, no dependencies.
+   Uses the SAME basis as breakEvenTokens (billed agent tokens and the actual
+   monthly budget, quote-derived when a quote exists) so the provider line
+   crosses the budget line exactly at the drawn break-even vertical
+   (audit finding: a totalMTok slope made the chart contradict its own math). */
+export function breakEvenChart(be, providerMonthlyCost) {
+  if (!be?.result || !providerMonthlyCost || !be.weightedCostPerMillion) return '<p class="dim">Chart appears once token volume and provider cost exist.</p>';
+  const ceilingMonthly = be.monthlyBudget;
+  const totalMTok = be.currentMTok;
   const W = 640, H = 280, PAD = 48;
   const maxX = Math.max(be.result * 2, totalMTok * 1.4, 1);
-  const costPerM = providerMonthlyCost / Math.max(totalMTok, 0.001);
+  const costPerM = be.weightedCostPerMillion;
   const maxY = Math.max(costPerM * maxX, ceilingMonthly * 1.4);
   const X = (m) => PAD + (m / maxX) * (W - PAD - 16);
   const Y = (c) => H - PAD - (c / maxY) * (H - PAD - 16);
@@ -215,11 +221,11 @@ export function breakEvenChart(be, ceilingMonthly, providerMonthlyCost, totalMTo
     <line x1="${PAD}" y1="${Y(ceilingMonthly)}" x2="${W - 16}" y2="${Y(ceilingMonthly)}" class="be-ceiling"/>
     <line x1="${X(be.result)}" y1="${H - PAD}" x2="${X(be.result)}" y2="${Y(ceilingMonthly)}" class="be-breakline"/>
     <circle cx="${X(totalMTok)}" cy="${Y(costPerM * totalMTok)}" r="5" class="be-now"/>
-    <text x="${X(totalMTok) + 8}" y="${Y(costPerM * totalMTok) - 8}" class="be-label">you are here (${fmt(totalMTok)} MTok)</text>
+    <text x="${X(totalMTok) + 8}" y="${Y(costPerM * totalMTok) - 8}" class="be-label">you are here (${fmt(totalMTok)} MTok billed)</text>
     <text x="${X(be.result) + 6}" y="${H - PAD - 8}" class="be-label">break even ${fmt(be.result)} MTok/mo</text>
-    <text x="${W - 20}" y="${Y(ceilingMonthly) - 6}" class="be-label" text-anchor="end">hw budget ceiling ${money(ceilingMonthly)}/mo</text>
+    <text x="${W - 20}" y="${Y(ceilingMonthly) - 6}" class="be-label" text-anchor="end">monthly owned budget ${money(ceilingMonthly)}</text>
     <text x="${W - 20}" y="${Y(costPerM * maxX) + 14}" class="be-label" text-anchor="end">provider cost</text>
-    <text x="${(W + PAD) / 2}" y="${H - 12}" class="be-tick" text-anchor="middle">million tokens per month</text>
+    <text x="${(W + PAD) / 2}" y="${H - 12}" class="be-tick" text-anchor="middle">million billed agent tokens per month</text>
   </svg>`;
 }
 
@@ -229,7 +235,7 @@ export function whiteboardCard(data) {
     `Estimated volume: ${fmt(data.monthlyRuns)} runs per month and ${fmt(data.monthlyTokens)} tokens per month`,
     `Current best route: ${data.route}`,
     `Why: ${data.why.join('; ')}`,
-    `Break even: private hardware starts to make sense near ${data.breakEvenMTok ? fmt(data.breakEvenMTok) : 'unknown'} million tokens per month, assuming ${data.ceilingMonthly ? money(data.ceilingMonthly) : 'unknown'} monthly owned budget and ${data.costPerMillion ? money(data.costPerMillion, 2) : 'unknown'} per million managed tokens`,
+    `Break even: private hardware starts to make sense near ${data.breakEvenMTok ? fmt(data.breakEvenMTok) : 'unknown'} million billed agent tokens per month, assuming ${data.ceilingMonthly ? money(data.ceilingMonthly) : 'unknown'} monthly owned budget and ${data.costPerMillion ? money(data.costPerMillion, 2) : 'unknown'} per million billed agent tokens`,
     `Next step: ${data.next}`,
   ].join('\n');
   return `<div class="card wb-card" id="whiteboard-card">

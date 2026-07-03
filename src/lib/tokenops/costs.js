@@ -48,7 +48,7 @@ export function roleRoutedCost(state, values, rates) {
       inputMTok: inTokM, cachedMTok: cachedM, uncachedMTok: uncachedM, outputMTok: outTokM,
       inputPrice: rate.inputPerMillion, cachedPrice, outputPrice: rate.outputPerMillion,
       cost, batchSavings, sourceId: rate.sourceId, lastReviewed: rate.lastReviewed, userSupplied: !!rate.userSupplied,
-      substitution: `${money(cost)} = (${fmt(uncachedM)} MTok * ${money(rate.inputPerMillion, 2)}) + (${fmt(cachedM)} MTok * ${money(cachedPrice, 2)}) + (${fmt(outTokM)} MTok * ${money(rate.outputPerMillion, 2)})${batchSavings ? ` - ${money(batchSavings)} batch discount` : ''}${uplift ? ` * ${fmt(1 + uplift, 2)} regional uplift` : ''}`,
+      substitution: `${money(cost)} = ${batchSavings || uplift ? '(' : ''}(${fmt(uncachedM)} MTok * ${money(rate.inputPerMillion, 2)}) + (${fmt(cachedM)} MTok * ${money(cachedPrice, 2)}) + (${fmt(outTokM)} MTok * ${money(rate.outputPerMillion, 2)})${batchSavings ? ` - ${money(batchSavings)} batch discount` : ''}${batchSavings || uplift ? ')' : ''}${uplift ? ` * ${fmt(1 + uplift, 2)} regional uplift` : ''}`,
     });
     total += cost;
   }
@@ -58,9 +58,13 @@ export function roleRoutedCost(state, values, rates) {
     embeddingFee = (values.monthlyEmbeddingTokens / 1e6) * state.embeddingPricePerMillion;
     total += embeddingFee;
   }
-  // Billable agent tokens this cost actually covers (for cost-per-million math).
-  const billedTokens = runs * plan.reduce((a, p) => a + p.inPerRun + p.outPerRun, 0);
-  return { total, perRole, embeddingFee, billedTokens };
+  // Billable agent tokens this cost actually covers (for cost-per-million
+  // math): PRICED roles only. Unpriced roles are surfaced, never silently
+  // averaged into a diluted rate (audit finding).
+  const missingRoles = perRole.filter((r) => r.missing).map((r) => `${r.role} (${r.provider}/${r.tier})`);
+  const pricedRoles = new Set(perRole.filter((r) => !r.missing).map((r) => r.role));
+  const billedTokens = runs * plan.filter((p) => pricedRoles.has(p.role)).reduce((a, p) => a + p.inPerRun + p.outPerRun, 0);
+  return { total, perRole, embeddingFee, billedTokens, missingRoles };
 }
 
 /* Same workload priced entirely inside one provider family (role tier mapping
@@ -144,14 +148,14 @@ export function hardwareCeiling(state, providerMonthlyCost) {
         id: 'hardwareCeilingMonthly',
         title: 'Hardware budget ceiling (monthly)',
         shortAnswer: `Owned hardware must beat ${money(ceilingMonthly)} per month to make sense.`,
-        whyItMatters: `Owned infrastructure must be at least ${state.savingsThresholdPercent} percent cheaper than the token route before cost alone can recommend it, because ownership adds operational risk, capacity planning, and lifecycle burden. This rule is visible on purpose.`,
+        whyItMatters: `Owned infrastructure must be at least ${pctThresh} percent cheaper than the token route before cost alone can recommend it, because ownership adds operational risk, capacity planning, and lifecycle burden. This rule is visible on purpose.`,
         plainEnglish: 'provider monthly cost times one minus the required savings threshold',
         algebra: 'ceilingMonthly = providerMonthlyCost * (1 - savingsThresholdPercent)',
         substitution: `${money(ceilingMonthly)} = ${money(providerMonthlyCost)} * ${fmt(threshold, 2)}`,
         result: ceilingMonthly, resultUnit: 'USD per month',
         variables: [
           { symbol: 'providerMonthlyCost', label: 'Provider monthly cost (baseline route)', value: providerMonthlyCost },
-          { symbol: 'savingsThresholdPercent', label: 'Required savings threshold', value: (state.savingsThresholdPercent ?? 40) / 100, editable: true },
+          { symbol: 'savingsThresholdPercent', label: 'Required savings threshold (clamped to 0-90)', value: pctThresh / 100, editable: true },
         ],
         assumptions: ['TokenOps never prices hardware. It tells you what the hardware has to cost. Hold real quotes against this ceiling.'],
         sourceIds: [], warnings: [], section: 'economics',
@@ -205,6 +209,8 @@ export function breakEvenTokens(state, values, providerMonthlyCost, billedTokens
     sourceIds: [], warnings: [], section: 'economics',
     currentMTok: billedMTok,
     totalMTok,
+    monthlyBudget,
+    weightedCostPerMillion,
     usageVersusBreakEven: be ? billedMTok / be : null,
   };
 }
@@ -214,11 +220,20 @@ export function breakEvenTokens(state, values, providerMonthlyCost, billedTokens
    (token counts AND prices) reacts, not just the price side. */
 export function optimizationLevers(state, values, rates, currentTotal, reEval) {
   const levers = [];
+  const baselinePriced = new Set(roleRoutedCost(state, values, rates).perRole.filter((r) => !r.missing).map((r) => r.role));
   const tryLever = (label, patch, note) => {
     const patched = { ...structuredClone(state), ...patch };
     if (patch.roles) patched.roles = { ...structuredClone(state.roles), ...patch.roles };
     const v2 = reEval(patched);
-    const { total } = roleRoutedCost(patched, v2, rates);
+    const { total, perRole } = roleRoutedCost(patched, v2, rates);
+    // Phantom-savings guard (audit finding): if the patched run drops a role
+    // that WAS priced in the baseline (target tier has no price), the delta
+    // is a fabrication, not a saving. Advise instead of lying.
+    const dropped = perRole.filter((r) => r.missing && baselinePriced.has(r.role));
+    if (dropped.length) {
+      levers.push({ label, savings: 0, note: `Needs a price for ${dropped.map((r) => `${r.provider}/${r.tier}`).join(', ')} before the effect can be computed honestly.`, substitution: 'not computed: target tier is unpriced' });
+      return;
+    }
     const savings = currentTotal - total;
     if (savings > 0.5) levers.push({ label, savings, note, substitution: `${money(savings)} per month = ${money(currentTotal)} now - ${money(total)} after` });
   };
@@ -231,6 +246,11 @@ export function optimizationLevers(state, values, rates, currentTotal, reEval) {
   if ((state.batchEligiblePercent ?? 0) < 80) tryLever('Batch 80 percent of background work', { batchEligiblePercent: 80 }, 'Applies the 50 percent batch discount where offered. Only honest for non-interactive work.');
   levers.sort((a, b) => b.savings - a.savings);
   return levers;
+}
+
+/* Primary lever = biggest REAL saving (advisory zero-savings entries never headline). */
+export function primaryLeverOf(levers) {
+  return levers.find((l) => l.savings > 0) ?? null;
 }
 
 export function rentedGpuCost(state, managedCostPerMillion = null) {
