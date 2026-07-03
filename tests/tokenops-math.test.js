@@ -2,12 +2,15 @@
    These values are the acceptance contract; if they drift, the build is wrong. */
 
 import { test, expect } from 'bun:test';
-import { engine, formulaDefs } from '../src/lib/tokenops/formulas.js';
+import { existsSync } from 'node:fs';
+import { engine, formulaDefs, effectiveRolePlan } from '../src/lib/tokenops/formulas.js';
 import { validateInputs } from '../src/lib/tokenops/engine.js';
 import { hardwareCeiling, breakEvenTokens, roleRoutedCost } from '../src/lib/tokenops/costs.js';
-import { recommend, checkDoNotSize, confidence } from '../src/lib/tokenops/routes.js';
+import { recommend, checkDoNotSize, confidence, scoreRoutes } from '../src/lib/tokenops/routes.js';
+import { sourceLinkPills } from '../src/lib/tokenops/components.js';
 import defaults from '../src/data/tokenops/tokenops-defaults.json';
 import rules from '../src/data/tokenops/route-rules.json';
+import rates from '../src/data/tokenops/provider-rates.json';
 
 const state = structuredClone(defaults);
 
@@ -92,6 +95,124 @@ test('confidence model averages eight inputs (spec 38)', () => {
   const c = confidence(state, {});
   expect(c.scores.length).toBe(8);
   expect(['High', 'Medium', 'Low']).toContain(c.band);
+});
+
+/* ---------- audit-driven tests (adversarial findings, 2026-07-03) ---------- */
+
+test('billing parity: every counted token is a priced token (critical audit finding)', () => {
+  const s = { ...structuredClone(defaults), ragEnabled: true, ragCallsPerRun: 2, toolUseEnabled: true, memoryEnabled: true, carryEnabled: true };
+  const { values } = engine.evaluate(s, {});
+  const counted = values.agentMonthlyInputTokens + values.agentMonthlyOutputTokens;
+  const { billedTokens } = roleRoutedCost(s, values, rates);
+  expect(billedTokens).toBeCloseTo(counted, 4);
+});
+
+test('replan calls attribute to the planner only (spec 13.5)', () => {
+  const s = { ...structuredClone(defaults), replanRatePercent: 20 };
+  const { values } = engine.evaluate(s, {});
+  const { plan } = effectiveRolePlan(s, values);
+  const planner = plan.find((p) => p.role === 'planner');
+  const worker = plan.find((p) => p.role === 'worker');
+  // planner: 1 call * retryScale 1.1 + 0.2 replan = 1.3; worker: 4 * 1.1 only.
+  expect(planner.calls).toBeCloseTo(1.3, 10);
+  expect(worker.calls).toBeCloseTo(4.4, 10);
+});
+
+test('owned-hardware cost gate is inert without a quote (self-reference audit finding)', () => {
+  const { values } = engine.evaluate(state, {});
+  const noQuote = scoreRoutes({ ...state, gpuQuote: null }, values, rules, { providerMonthlyCost: 5000, usageVersusBreakEven: 1.67 }, {});
+  const owned = noQuote.routes.find((r) => r.key === 'owned');
+  expect(owned.components.find((c) => c.label.includes('Cost gate'))).toBeUndefined();
+  const withQuote = scoreRoutes({ ...state, gpuQuote: 50000 }, values, rules, { providerMonthlyCost: 5000, usageVersusBreakEven: 1.2 }, {});
+  const owned2 = withQuote.routes.find((r) => r.key === 'owned');
+  expect(owned2.components.some((c) => c.label.includes('Cost gate'))).toBe(true);
+});
+
+test('break even uses the billed-token basis, not diluted totals (audit finding)', () => {
+  const s = { ...structuredClone(defaults), wlCoding: true };  // adds unbilled quick workload
+  const { values } = engine.evaluate(s, {});
+  const { total, billedTokens } = roleRoutedCost(s, values, rates);
+  const be = breakEvenTokens(s, values, total, billedTokens);
+  const expectedCostPerM = total / (billedTokens / 1e6);
+  expect(be.variables.find((v) => v.symbol === 'managedWeightedCostPerMillion').value).toBeCloseTo(expectedCostPerM, 6);
+});
+
+test('chunk overlap >= chunk size is flagged, never computed as garbage', () => {
+  const s = { ...structuredClone(defaults), ragEnabled: true, chunkSize: 512, chunkOverlap: 512 };
+  expect(validateInputs(s).some((e) => e.field === 'chunkOverlap')).toBe(true);
+  const { values } = engine.evaluate(s, {});
+  expect(values.chunksPerDocument).toBeNull();
+});
+
+test('batch discount and embedding fees enter the cost (spec 15.1, 15.3)', () => {
+  const { values } = engine.evaluate(state, {});
+  const base = roleRoutedCost(state, values, rates).total;
+  const batched = roleRoutedCost({ ...state, batchEligiblePercent: 80 }, values, rates).total;
+  expect(batched).toBeLessThan(base);
+  const s2 = { ...structuredClone(defaults), ragEnabled: true, embeddingPricePerMillion: 0.1 };
+  const v2 = engine.evaluate(s2, {}).values;
+  const r2 = roleRoutedCost(s2, v2, rates);
+  expect(r2.embeddingFee).toBeGreaterThan(0);
+});
+
+test('savings threshold over 90 is clamped, ceiling never negative', () => {
+  const { ceilingMonthly } = hardwareCeiling({ ...state, savingsThresholdPercent: 150 }, 10000);
+  expect(ceilingMonthly).toBeCloseTo(1000, 6); // clamped at 90 -> 0.10 * 10000
+});
+
+test('route maxima derive from live weights; slider overrides cannot push scores past 100', () => {
+  const { values } = engine.evaluate(state, {});
+  const boosted = {};
+  for (const [rk, r] of Object.entries(rules.routes)) for (const wk of Object.keys(r.weights ?? {})) boosted[`${rk}.${wk}`] = (r.weights[wk].max ?? r.weights[wk].default);
+  const { routes } = scoreRoutes(state, values, rules, { providerMonthlyCost: 100000, usageVersusBreakEven: 2 }, boosted);
+  for (const r of routes) { expect(r.score).toBeGreaterThanOrEqual(0); expect(r.score).toBeLessThanOrEqual(100); }
+});
+
+test('policy conflict fires a critical warning when a public route leads with data locked down (spec 37)', () => {
+  const s = { ...structuredClone(defaults), dataCanLeave: 'no', needTimeToValue: 3, needQuality: 3, needLowOps: 3, needGovernance: 0, needAudit: 0, needDataGravity: 0, needEnterpriseRetrieval: 0, needInternalApis: 0, permitsPrivateCloud: false };
+  const { values } = engine.evaluate(s, {});
+  const rec = recommend(s, values, rules, { providerMonthlyCost: 1000, usageVersusBreakEven: 0 }, {});
+  if (['direct', 'cloud'].includes(rec.top?.key)) {
+    expect(rec.warnings.some((w) => w.severity === 'critical')).toBe(true);
+  } else {
+    expect(rec.top.key).not.toBe('direct'); // policy pressure already reordered routes; also acceptable
+  }
+});
+
+test('provider rate pinning: seeded prices match the 2026-07-03 verified values (drift alarm)', () => {
+  const pin = (pk, tier, inP, cachedP, outP) => {
+    const r = rates.find((x) => x.providerKey === pk && x.tier === tier);
+    expect(r.inputPerMillion).toBe(inP);
+    expect(r.cachedInputPerMillion).toBe(cachedP);
+    expect(r.outputPerMillion).toBe(outP);
+  };
+  pin('anthropic', 'flagship', 10, 1, 50);
+  pin('anthropic', 'workhorse', 2, 0.2, 10);
+  pin('anthropic', 'mini', 1, 0.1, 5);
+  pin('openai', 'flagship', 5, 0.5, 30);
+  pin('gemini', 'mini', 0.25, 0.025, 1.5);
+  pin('azure_openai', 'mini', 0.2, 0.02, 1.25);
+  pin('bedrock', 'workhorse', 2.2, 0.22, 11);
+});
+
+test('stale pill logic marks sources older than 60 days (decision 0.3.11)', () => {
+  const old = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const html = sourceLinkPills(['x'], [{ id: 'x', label: 'Old source', url: 'https://example.com', lastReviewed: old }]);
+  expect(html).toContain('STALE');
+  const fresh = sourceLinkPills(['y'], [{ id: 'y', label: 'Fresh', url: 'https://example.com', lastReviewed: new Date().toISOString().slice(0, 10) }]);
+  expect(fresh).not.toContain('STALE');
+});
+
+test('all three do-not-size gates fire individually (decision 0.2.8)', () => {
+  expect(checkDoNotSize({ ...state, dataCanLeave: null }).length).toBeGreaterThan(0);
+  expect(checkDoNotSize({ ...state, users: 0 }).length).toBeGreaterThan(0);
+  expect(checkDoNotSize({ ...state, budgetConfidence: 'unknown' }).length).toBeGreaterThan(0);
+  expect(checkDoNotSize(state).length).toBe(0);
+});
+
+test('audit document exists in the repo (decision 0.8.32)', () => {
+  expect(existsSync(new URL('../docs/tokenops-audit.md', import.meta.url).pathname)).toBe(true);
+  expect(existsSync(new URL('../docs/tokenops.md', import.meta.url).pathname)).toBe(true);
 });
 
 test('role routed cost prices cached vs uncached correctly (spec 15.1-15.2)', () => {

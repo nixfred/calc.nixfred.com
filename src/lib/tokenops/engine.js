@@ -118,8 +118,13 @@ export function validateInputs(s) {
   if (s.gpuMemoryUtilizationTarget !== undefined && (s.gpuMemoryUtilizationTarget <= 0 || s.gpuMemoryUtilizationTarget > 1)) {
     bad('gpuMemoryUtilizationTarget', 'GPU memory utilization target must be greater than 0 and at most 1.');
   }
-  if (s.dataCanLeave === 'no' && s.routePreference === 'direct') {
-    bad('routePreference', 'Policy gate says data cannot leave the environment, but a direct public provider route is selected.', 'critical');
+  if (s.ragEnabled && s.chunkOverlap >= s.chunkSize) {
+    bad('chunkOverlap', 'Chunk overlap must be smaller than chunk size, or chunk math divides by zero or goes negative.');
   }
+  if (s.savingsThresholdPercent !== undefined && (s.savingsThresholdPercent < 0 || s.savingsThresholdPercent > 90)) {
+    bad('savingsThresholdPercent', 'Savings threshold must be 0 to 90 percent; higher values invert the ceiling math.', 'caution');
+  }
+  // The public-route-vs-policy conflict is enforced in the recommendation
+  // engine (spec 37 critical warning), where the leading route is known.
   return out;
 }

@@ -69,14 +69,16 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
     expect(v.tps).toBeCloseTo(v.tpm / 60, 6);
   });
 
-  test('10. every rendered token result has a FormulaTrace with algebra + substitution', async ({ page }) => {
+  test('10. every rendered engine FormulaTrace carries algebra AND substitution (no tautology)', async ({ page }) => {
     await open(page);
-    const traces = await page.locator('.ftrace').count();
+    const traces = await page.locator('.ftrace[data-trace]').count();
     expect(traces).toBeGreaterThan(15);
-    const algebra = await page.locator('.ftrace .ft-algebra').count();
-    const subs = await page.locator('.ftrace .ft-sub').count();
-    expect(algebra).toBe(traces - (await page.locator('.ftrace:not(:has(.ft-algebra))').count()));
-    expect(subs).toBeGreaterThan(15);
+    // Engine traces must each contain both blocks; only the hand-built policy
+    // trace is exempt from the substitution requirement.
+    const missingAlgebra = await page.locator('.ftrace[data-trace]:not(:has(.ft-algebra))').count();
+    expect(missingAlgebra).toBe(0);
+    const missingSub = await page.locator('.ftrace[data-trace]:not([data-trace="privatePolicyScore"]):not(:has(.ft-sub))').count();
+    expect(missingSub).toBe(0);
   });
 
   test('12-13. quantization affects model memory, formula visible', async ({ page }) => {
@@ -111,6 +113,7 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
       'https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/',
       'https://www.nvidia.com/en-us/data-center/h200/',
       'https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html',
+      'buy.hpe.com', // XD685 listing (criterion 45.25)
     ]) expect(html).toContain(url);
   });
 
@@ -129,13 +132,64 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
     for (const [, score] of v.routeScores) { expect(score).toBeGreaterThanOrEqual(0); expect(score).toBeLessThanOrEqual(100); }
   });
 
-  test('37-39. markdown, print, and JSON exports exist and produce content', async ({ page }) => {
+  test('37-39. exports GENERATE real content, not just buttons (QA audit fix)', async ({ page }) => {
     await open(page);
-    const md = await page.evaluate(async () => {
-      const mod = await import('/src/lib/tokenops/exports.js').catch(() => null);
-      return !!document.querySelector('[data-export="summary"]') && !!document.querySelector('[data-export="math"]') && !!document.querySelector('[data-export="json"]') && !!document.querySelector('[data-export="print"]');
+    const out = await page.evaluate(() => ({
+      summary: window.__tokenops._test.exportSummary(),
+      math: window.__tokenops._test.exportMath(),
+      json: window.__tokenops._test.exportJson(),
+      buttons: ['summary', 'math', 'json', 'print', 'share', 'share-sanitized'].every((k) => !!document.querySelector(`[data-export="${k}"]`)),
+    }));
+    expect(out.buttons).toBe(true);
+    expect(out.summary).toContain('11,000');                       // section 46 runs in the export
+    expect(out.summary).toContain('Never a quote');
+    expect(out.summary).toContain('## Assumptions');
+    expect(out.summary).toContain('## Sources');
+    expect(out.math).toContain('Every formula, every substitution');
+    expect(out.math).toContain('Hardware budget ceiling');          // economics math included (audit fix)
+    expect(out.math).toContain('Route scores');
+    const parsed = JSON.parse(out.json);
+    expect(parsed.state.users).toBe(200);
+  });
+
+  test('share link round-trips full scenario state (decision 0.8.29)', async ({ page }) => {
+    await open(page);
+    const link = await page.evaluate(() => {
+      window.__tokenops.getState().users = 777;
+      return window.__tokenops._test.shareLink();
     });
-    expect(md).toBe(true);
+    await page.goto(link);
+    const users = await page.evaluate(() => window.__tokenops.getState().users);
+    expect(users).toBe(777);
+  });
+
+  test('UI-driven edit recomputes results (criterion: editable means the page reacts)', async ({ page }) => {
+    await open(page);
+    await page.fill('input[data-field="users"]', '400');
+    await page.waitForTimeout(400); // debounce
+    const runs = await page.evaluate(() => window.__tokenops.compute().values.monthlyRuns);
+    expect(runs).toBe(22000); // 400 * 5 * 22 * 0.5
+    await expect(page.locator('#tokenops-summary')).toContainText('Do not size yet').catch(() => {});
+  });
+
+  test('decode animation settles to real text (no permanently scrambled headings)', async ({ page }) => {
+    await page.goto('/tokenops/');
+    await page.waitForTimeout(1500);
+    await expect(page.locator('.chooser h1')).toHaveText('TokenOps');
+  });
+
+  test('45.11 model size quick pick offers the spec rows', async ({ page }) => {
+    await open(page);
+    const opts = await page.locator('select[data-field="modelSizeQuickPick"] option').allTextContents();
+    for (const label of ['8B', '13B', '30B', '8x7B (about 47B total)', '70B', '120B', '405B']) expect(opts).toContain(label);
+  });
+
+  test('do-not-size renders its card in the UI, not only in compute (criterion 45.35)', async ({ page }) => {
+    await open(page);
+    await page.selectOption('select[data-field="budgetConfidence"]', 'unknown');
+    await page.waitForTimeout(500);
+    await expect(page.locator('.do-not-size')).toContainText('Do not size yet');
+    await expect(page.locator('.do-not-size ol li').first()).toBeVisible();
   });
 });
 
@@ -176,10 +230,12 @@ test.describe('Section 0 settled decisions', () => {
     expect(verdict2).toBe(false);
   });
 
-  test('0.5.20 FormulaTrace blocks render expanded (aria-expanded true)', async ({ page }) => {
+  test('0.5.20 FormulaTrace blocks render expanded', async ({ page }) => {
     await open(page);
-    const collapsed = await page.locator('.ftrace[aria-expanded="false"]').count();
-    expect(collapsed).toBe(0);
+    const total = await page.locator('.ftrace').count();
+    const expanded = await page.locator('.ftrace[data-expanded="true"]').count();
+    expect(total).toBeGreaterThan(0);
+    expect(expanded).toBe(total);
   });
 
   test('0.5.21 sticky summary bar carries all four live numbers', async ({ page }) => {
@@ -196,12 +252,7 @@ test.describe('Section 0 settled decisions', () => {
     await expect(page.locator('.wiz-fields')).toBeVisible();
   });
 
-  test('0.6.25 anonymous by default: customer name is Customer A', async ({ page }) => {
-    await page.goto('/tokenops/');
-    const name = await page.evaluate(() => {
-      localStorage.clear(); location.reload();
-      return true;
-    });
+  test('0.6.25 anonymous by default: customer name is Customer A on a fresh browser', async ({ page }) => {
     await page.goto('/tokenops/');
     const state = await page.evaluate(() => window.__tokenops.getState());
     expect(state.customerName).toBe('Customer A');

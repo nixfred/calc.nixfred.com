@@ -212,6 +212,9 @@ export const SECTIONS = [
     id: 'sizing', title: 'Private inference sizing',
     blurb: 'Memory fit and throughput fit are separate gates. The bigger one wins.',
     fields: [
+      sel('modelSizeQuickPick', 'Model size quick pick', [
+        ['', 'custom'], ['8', '8B'], ['13', '13B'], ['30', '30B'], ['47', '8x7B (about 47B total)'], ['70', '70B'], ['120', '120B'], ['405', '405B'],
+      ], { hint: 'Sets the parameter count below. The spec model rows, one click each.' }),
       num('modelParamsB', 'Model parameters (billions)', { min: 0.5, step: 0.5 }),
       sel('quantization', 'Quantization', [['fp16', 'FP16 / BF16 (2 B/param)'], ['fp8', 'FP8 (1 B/param)'], ['int8', 'INT8 (1 B/param)'], ['int4', 'INT4 (0.5 B/param)']]),
       num('modelInstances', 'Model instances', { min: 1 }),

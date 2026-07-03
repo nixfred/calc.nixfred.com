@@ -95,11 +95,74 @@ not machine-checkable), PENDING.
 31. PASS Automated Playwright harness encodes section 46 numbers, machine-checkable section 45 criteria, and section 0 decisions. 21 e2e + 13 unit tests green.
 32. PASS This document mirrors the harness.
 
-## Adversarial audit findings
+## Adversarial audit findings and dispositions
 
 Five independent expert auditors (formula math, economics math, spec
-compliance, UI design, QA coverage) attacked the build. Findings and their
-resolutions are appended below when the audit completes.
+compliance, UI design, QA coverage) attacked the build on 2026-07-03 and
+returned 73 findings. Dispositions:
+
+### Fixed (the ones that mattered)
+
+1. CRITICAL (math): the cost engine billed fewer tokens than the demand model
+   counted; snowball, tool, memory, and RAG tokens appeared in demand cards
+   but cost zero dollars. Fixed with a single shared token plan
+   (effectiveRolePlan) feeding BOTH demand and cost; a billing-parity unit
+   test now enforces counted tokens = priced tokens forever.
+2. CRITICAL (economics): the owned-hardware cost gate was self-referential
+   and always awarded full points when no quote existed. The gate is now
+   inert without a real quote and says so on the card.
+3. MAJOR: break even divided an agent-only cost by all-workload tokens,
+   overstating break even and biasing routes against ownership. Now uses the
+   billed-token basis; unit tested.
+4. MAJOR: batch discount, regional uplift, and embedding fees were collected
+   but never priced. All three now enter roleRoutedCost; unit tested.
+5. MAJOR: chunk overlap >= chunk size produced Infinity or negative chunks
+   silently. Validated and guarded; unit tested.
+6. MAJOR: route normalization maxima were hardcoded and went stale under
+   slider overrides. Maxima now derive from live weight values; a
+   max-slider test proves scores stay in 0 to 100.
+7. MAJOR: replan calls were smeared across all roles; spec says planner only.
+   Fixed in the shared plan; unit tested (1.3 planner calls at 20 percent).
+8. MAJOR (design): WCAG AA failure on the faint text color (3.3 to 3.7:1),
+   mobile horizontal overflow clipping a third of the UI, native light
+   dropdowns on the dark page, invisible focus states, whisper-weak primary
+   buttons, an illegible summary bar. All fixed in CSS; mobile overflow now
+   measured at 0 px.
+9. MAJOR (QA): tautological FormulaTrace test, exports tested by button
+   existence only, share links untested, engine driven around the UI. The
+   harness now asserts export CONTENT, round-trips a share link, drives a
+   real input through the DOM, and checks the decode animation settles.
+10. Policy-conflict critical warning (spec 37), missing-data on every
+    recommendation (31.10.7), private policy score as a visible formula
+    (13.2), assumptions panel (39), backend fabric rules (27.5), optimization
+    levers with recomputed dollar effects (32), gate-won display (25.5),
+    calendar tokens per second (14.7), rented GPU break even (30.2),
+    per-rate-row staleness, benchmark source pills, XD685 link assertion,
+    model size quick pick (45.11), spec-pinned rate drift tests, exception
+    safe state save/restore, savings threshold clamping, a11y labels on rate
+    inputs and likert radios, copy formula/result/markdown buttons (10.12-14),
+    global reset, richer exports (34.1/34.2 sections): all implemented.
+
+### Documented deviations, pending Fred's morning review
+
+1. Token anatomy per role (13.6) uses per-call input/output totals instead of
+   the ten-component breakdown, and P50/P90/P99 fields are not implemented.
+   The QA scenario and every formula operate on totals; components would add
+   about 60 Architect inputs. Decision needed: ship totals or build the
+   component mode in release 1.1.
+2. Escalation percent and growth percent are captured but do not yet move
+   token math (documented as release-two along with scenario comparison).
+3. Storage card shows retention-adjusted totals but not the separate
+   1-month/3-month/1-year lines or embedding/log line items (24, 33.6).
+4. Context sections 13.1/13.4/26 carry the high-impact fields, not every
+   listed field (procurement dates, benchmark latency percentiles, etc.).
+5. Custom and negotiated rates share one provider family (17.9 vs 17.10).
+6. Meeting Mode shows the ceiling and summary bar but not a dedicated
+   private-inference-fit panel (8.1.7); Architect has the full section.
+7. Tool schema overhead is attributed to tool-planning and summary calls
+   (stated as an assumption on the trace) rather than every call.
+8. L40S, Dell XE9680L, Supermicro HGX intentionally deferred to release two
+   by settled decision 0.4.17; criterion 45.28 superseded.
 
 ## How to re-run the audit
 
