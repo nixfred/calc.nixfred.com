@@ -4,7 +4,7 @@
 
 import { engine } from './formulas.js';
 import { validateInputs, fmt, money } from './engine.js';
-import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers, primaryLeverOf } from './costs.js';
+import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers, primaryLeverOf, financeDecision } from './costs.js';
 import { recommend, confidence, discoveryQuestions, privatePolicyScore } from './routes.js';
 import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LABELS } from './sections.js';
 import * as C from './components.js';
@@ -70,9 +70,10 @@ export function createApp(root, data) {
       : 'Public list pricing may not match contract pricing.';
     const lever0 = primaryLeverOf(levers);
     if (lever0) rec.primaryLever = `${lever0.label} (saves about ${Math.round(lever0.savings).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} per month).`;
+    const fin = financeDecision(state, providerBaseline, ceiling);
     const disc = discoveryQuestions(state);
     const policy = privatePolicyScore(state, rules, weightOverrides);
-    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy };
+    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy, fin };
   }
 
   /* ---------- field rendering ---------- */
@@ -136,7 +137,7 @@ export function createApp(root, data) {
       costPerMillion: cx.be?.weightedCostPerMillion,
       next: cx.rec.nextAction,
     });
-    const econ = `<div class="card" id="econ-card">
+    const econ = `${C.decisionCard(state, cx.fin, cx.providerBaseline, cx.ceiling)}<div class="card" id="econ-card">
       <h3 class="card-title">The hardware budget ceiling</h3>
       <p class="ceiling-headline mono">${money(cx.ceiling.ceilingCapex)}</p>
       <p>For on premises to make sense, the recommended configuration must come in under this number all-in (${money(cx.ceiling.ceilingMonthly)} per month over ${state.usefulLifeMonths} months). TokenOps does not price hardware. It tells you what the hardware has to cost.</p>
@@ -329,10 +330,14 @@ export function createApp(root, data) {
     const t = e.target;
     if (t.dataset.field && !t.dataset.toggle && t.dataset.likert === undefined) {
       const raw = t.value;
-      const val = t.type === 'number' ? (raw === '' ? null : Number(raw)) : raw;
+      const val = (t.type === 'number' || t.type === 'range') ? (raw === '' ? null : Number(raw)) : raw;
       setPath(state, t.dataset.field, val);
       if (t.dataset.field === 'topologyType' && TOPOLOGY_PRESETS[raw]) Object.assign(state, TOPOLOGY_PRESETS[raw]);
       debouncedRefresh();
+    }
+    if (t.type === 'range' && t.dataset.field) {
+      const lab = t.parentElement.querySelector('.slider-val');
+      if (lab) lab.textContent = t.dataset.field === 'gpuQuote' ? '$' + Number(t.value).toLocaleString() : (t.dataset.field === 'financeAprPercent' ? t.value + '%' : t.value);
     }
     if (t.dataset.weight !== undefined) {
       weightOverrides[t.dataset.weight] = Number(t.value);

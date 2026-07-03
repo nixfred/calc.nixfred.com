@@ -321,3 +321,20 @@ test('meeting answer page relists the wizard inputs (Fred ask 2026-07-03)', asyn
   await expect(page.locator('#inputs-recap')).toContainText('Adoption');
   await expect(page.locator('#inputs-recap')).toContainText('Data can leave');
 });
+
+test('decision card: verdict banner flips as the quote slider moves (Fred ROI ask)', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.evaluate(() => document.querySelector('button[data-goto="architect"]').click());
+  await expect(page.locator('#decision-card .v-quote')).toBeVisible(); // no quote: GET A QUOTE
+  const verdicts = await page.evaluate(() => {
+    const s = window.__tokenops.getState();
+    const out = [];
+    const base = window.__tokenops.compute().providerBaseline;
+    s.financeMode = 'cash'; s.financeTermMonths = 36;
+    s.gpuQuote = base * 36 * 0.5;  out.push(window.__tokenops.compute().fin.verdict); // well under bar
+    s.gpuQuote = base * 36 * 0.8;  out.push(window.__tokenops.compute().fin.verdict); // between bar and tokens
+    s.gpuQuote = base * 36 * 1.5;  out.push(window.__tokenops.compute().fin.verdict); // above tokens
+    return out;
+  });
+  expect(verdicts).toEqual(['buy', 'negotiate', 'tokens']);
+});

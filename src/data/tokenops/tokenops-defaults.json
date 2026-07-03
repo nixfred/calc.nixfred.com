@@ -228,5 +228,8 @@
   "opsReadinessConfidence": "medium",
   "mode": null,
   "usageVolumeKnown": true,
-  "quickInputSharePercent": 70
+  "quickInputSharePercent": 70,
+  "financeMode": "cash",
+  "financeTermMonths": 36,
+  "financeAprPercent": 8
 }
