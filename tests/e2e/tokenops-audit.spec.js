@@ -308,3 +308,16 @@ test.describe('Section 0 settled decisions', () => {
     await expect(page.locator('#tokenops-root')).toBeVisible();
   });
 });
+
+test('meeting answer page relists the wizard inputs (Fred ask 2026-07-03)', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.evaluate(() => document.querySelector('button[data-goto="meeting"]').click());
+  for (let i = 0; i < 4; i++) {
+    await page.locator('button[data-wiz="next"]').click();
+    await page.waitForTimeout(150);
+  }
+  await expect(page.locator('#inputs-recap')).toBeVisible();
+  await expect(page.locator('#inputs-recap')).toContainText('What you told it');
+  await expect(page.locator('#inputs-recap')).toContainText('Adoption');
+  await expect(page.locator('#inputs-recap')).toContainText('Data can leave');
+});

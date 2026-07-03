@@ -155,6 +155,7 @@ export function createApp(root, data) {
       ${cx.rented ? C.formulaTrace(cx.rented, sources) : ''}
     </div>`;
     const parts = [
+      ...(meeting ? [C.inputsRecapCard(state)] : []),
       C.recommendationCard(cx.rec, cx.conf, sources),
       econ,
       C.optimizationCard(cx.levers),

@@ -93,6 +93,44 @@ export function recommendationCard(rec, conf, sources = []) {
   </div>`;
 }
 
+/* Meeting Mode answer page: relist everything entered in the wizard so the
+   report is self-contained (Fred's ask, 2026-07-03). */
+export function inputsRecapCard(state) {
+  const yn = (v) => (v ? 'yes' : 'no');
+  const quick = [
+    state.wlRag ? `RAG assistant quick workload: ${state.concurrentConnections} connections x ${state.ragDays} days x ${state.ragHours} hours` : null,
+    state.wlAgents ? `Always-on agents quick workload: ${state.workflows} workflows x ${state.agDays} days x ${state.agHours} hours` : null,
+    state.wlCoding ? `Coding assistant quick workload: ${state.developers} developers x ${state.codDays} days x ${state.codHours} hours` : null,
+    state.wlAgenticCoding ? `Agentic coding quick workload: ${state.acDevelopers} developers x ${state.acDays} days x ${state.acHours} hours` : null,
+    (state.customWorkloadMonthlyTokens ?? 0) > 0 ? `Custom workload: ${fmt(state.customWorkloadMonthlyTokens)} tokens per month` : null,
+  ].filter(Boolean);
+  const rows = [
+    ['Scenario', state.scenarioName],
+    ['Customer', state.customerName],
+    ['Customer size', state.customerSize],
+    ['Budget signal', state.budgetConfidence],
+    ['Users', fmt(state.users)],
+    ['Runs per user per day', state.runsPerUserPerDay],
+    ['Adoption', `${state.adoptionPercent}%`],
+    ['Active days per month', state.activeDaysPerMonth],
+    ['Data can leave', state.dataCanLeave ?? 'unanswered'],
+    ['Regulated data', yn(state.regulatedData)],
+    ['Must run on premises', yn(state.requiresOnPrem)],
+    ['Agent topology', state.topologyType],
+    ['Prompt cache hits', `${state.cachedInputPercent}%`],
+    ['Retry rate', `${state.retryRatePercent}%`],
+    ['Quick workload input/output split', `${state.quickInputSharePercent ?? 70}/${100 - (state.quickInputSharePercent ?? 70)}`],
+  ];
+  return `<div class="card" id="inputs-recap">
+    <h3 class="card-title">What you told it</h3>
+    <p class="dim">Every answer from the wizard, restated so this report stands alone. Change any of it with back, or in Architect Mode.</p>
+    <div class="table-wrap"><table class="cmp-table"><tbody>
+      ${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="mono">${esc(v)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${quick.length ? `<p class="dim">Also active:</p><ol>${quick.map((q) => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}
+  </div>`;
+}
+
 export function optimizationCard(levers) {
   if (!levers?.length) return '';
   return `<div class="card">
@@ -139,7 +177,7 @@ export function providerTable(cmp, providerMeta, sources) {
   }).join('');
   return `<div class="card">
     <h3 class="card-title">Provider comparison</h3>
-    <p class="dim">The whole workload priced inside each provider family: agent roles at their tiers, quick-formula workloads at the worker rate with an editable input/output split. Public list prices, editable in the rates panel. Never a quote.</p>
+    <p class="dim">The whole workload priced inside each provider family: agent roles at their tiers, quick-formula workloads at the worker rate with an editable input/output split. Public list prices, editable in the rates panel. Never a quote. Tier classes differ across families (Azure's workhorse SKU is a mini-class model), so compare like-for-like models before quoting a winner.</p>
     <div class="table-wrap"><table class="cmp-table">
       <thead><tr><th>provider</th><th>monthly</th><th>per run</th><th>per user</th><th>source</th></tr></thead>
       <tbody>${rows}</tbody>
