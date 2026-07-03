@@ -16,6 +16,8 @@
 .sum-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted); text-transform: lowercase; }
 .sum-value { font-size: 1.1rem; color: var(--accent-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+.howto-link { font-size: 0.8rem; margin: 0 0 1rem; }
+
 /* ---------- build-in (no glyph scrambling inside the calculator) ---------- */
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }

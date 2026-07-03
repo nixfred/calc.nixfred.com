@@ -1,0 +1,90 @@
+---
+import Base from '../../layouts/Base.astro';
+import '../../styles/tokenops.css';
+---
+<Base
+  title="How to use the Nutanix Conversation Sizer - calc.nixfred.com"
+  description="The long-form field manual for the Nutanix Conversation Sizer: every input explained, how the node range is built, and how to run it in a live customer conversation."
+>
+  <main class="tokenops-main">
+    <div class="wizard" style="max-width: 46rem;">
+      <h1>How to use the Nutanix Conversation Sizer</h1>
+      <p class="dim">The field manual. Every rule in this tool comes from the public <a href="https://github.com/nixfred/nutanix">NutaNIX field guide</a>, appendix F. <a href="/nutanix-sizer">Open the sizer</a>.</p>
+
+      <div class="card">
+        <h3 class="card-title">1. What this is and when to open it</h3>
+        <p>The sizer turns a VM estate into an honest <strong>node count range</strong> during a live conversation: raw-to-usable storage math, the CVM tax paid up front, realistic ceilings, and a failure reserve, in about sixty seconds of typing.</p>
+        <p>Open it when you hear:</p>
+        <ol>
+          <li>"Roughly how many nodes would our environment need?"</li>
+          <li>"What do we really get out of 30 terabytes raw?"</li>
+          <li>"Why does everyone say Nutanix eats resources for its storage controller?"</li>
+          <li>"Can you ballpark this before we run the formal sizing?"</li>
+        </ol>
+        <p>Two disciplines are built in and cannot be turned off: it quotes ranges, never single numbers, and it says on every output that <strong>Nutanix Sizer is the source of truth</strong>. This tool gets the conversation within roughly 25 percent; Sizer produces the number that goes in a contract.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">2. The inputs, in the order that matters</h3>
+        <p><strong>Workload preset first.</strong> General virtualization, VDI, or Database. The preset sets four things at once: the vCPU-to-physical-core ratio, compression and dedup expectations, and the CVM profile. Presets are honest starting points, not answers; every value stays editable after you pick one.</p>
+        <p><strong>The estate.</strong> VM count, average vCPU, average RAM, used storage in TB. Averages are fine here; that is what a conversation-grade estimate means. If the customer has RVTools-style actuals, even better, type those.</p>
+        <p><strong>Growth.</strong> Annual percent and the sizing window, default 24 months. The guide's rule: size for 18 to 24 months of growth, then plan to add nodes. Sizing for five years buys idle hardware; sizing for today fills the cluster the day the growth arrives.</p>
+        <p><strong>Data protection.</strong> RF2, RF3, or erasure coding. This is the biggest storage lever in the tool:</p>
+        <ol>
+          <li>RF2: 50 percent of raw is usable, tolerates one node failure, three-node minimum. The default answer for most estates.</li>
+          <li>RF3: 33 percent usable, tolerates two simultaneous failures, five-node minimum. Costs a third more raw capacity than RF2, so make the customer earn it: what are the actual RTO and RPO requirements, and what does the backup layer already cover?</li>
+          <li>EC-X 4+1 and 4+2: 80 and 67 percent usable, for cold and archival data, with six and seven node minimums. Not for hot latency-sensitive workloads.</li>
+        </ol>
+        <p><strong>The CVM profile.</strong> Light (8 vCPU / 32 GB), Standard (12 / 48), Heavy (16 / 64). This is the storage controller running on every node, and the tool subtracts it from usable resources before a single guest VM lands. When a competitor calls it overhead, the honest answer is yes, and here it is with numbers.</p>
+        <p><strong>The node profile.</strong> Cores, RAM, raw TB per node. The default is a middle-of-the-road box; type the actual hardware model under discussion for a sharper range.</p>
+        <p><strong>The ratios.</strong> Compression, dedup, and vCPU-to-pCPU. The efficiency defaults come from the guide's planning ranges (and the guide is blunt: never quote marketing 4 to 6x compression). The overcommit ratios are field heuristics, 4:1 general and 2:1 database, labeled as such because the guide deliberately publishes none.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">3. How the range is built (the whole chain is on the page)</h3>
+        <ol>
+          <li>Growth compounds the estate over the window.</li>
+          <li>Raw becomes usable: the RF multiplier, minus the 10 to 15 percent platform reservation.</li>
+          <li>Usable becomes effective: times the 75 percent storage ceiling (snapshots live inside that headroom), times compression, times dedup.</li>
+          <li>Three gates compute independently: nodes by CPU (after the CVM vCPU tax and the 70 percent ceiling), nodes by RAM (after CVM RAM and the 80 percent ceiling), nodes by storage.</li>
+          <li>The biggest gate wins, the failure reserve is added (N+1 for RF2, N+2 for RF3), and the result clamps to the RF minimum node count.</li>
+          <li>The honest ceiling: floor times 1.25, because the guide says these heuristics land within roughly 25 percent, so a range is the only honest quote.</li>
+        </ol>
+        <p>Every step renders as a formula card with algebra, your numbers substituted live, the assumptions, and a source link to the exact appendix that justifies it. The summary bar pins the range, the binding gate, effective TB per node, and storage demand while you scroll.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">4. The four outputs and what to do with each</h3>
+        <ol>
+          <li><strong>The answer.</strong> One sentence: "This estate fits in roughly N to M nodes of this profile at RF2," with the binding gate named. Say it out loud exactly as written, range and all.</li>
+          <li><strong>The whiteboard card.</strong> Five lines built to be copied onto an actual whiteboard: estate, range, effective per node, CVM tax, and the pre-sizer disclaimer. The copy button gives you plain text.</li>
+          <li><strong>The conversation script.</strong> Five quotable lines in the field guide's voice: why ranges, how to frame RF2 versus RF3, the CVM honesty line, the data-efficiency expectation reset, and the headroom defense. These exist so the hard questions get answered the same way every time, well.</li>
+          <li><strong>The next action.</strong> The formal handoff: run Nutanix Sizer with real workload data, what to collect before that meeting (per-VM actuals, peak IOPS, RPO and RTO per tier, growth targets), and the risk areas to say out loud.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">5. Three conversation plays</h3>
+        <ol>
+          <li><strong>The ballpark ask.</strong> "Just roughly, what would we need?" Type the four estate numbers, read the answer sentence, then screenshot the whiteboard card into the follow-up email. Total elapsed time: under two minutes, and nothing you said tonight contradicts what Sizer says next week, because you quoted a range.</li>
+          <li><strong>The CVM objection.</strong> A competitor said the storage controller eats the cluster. Open the CPU gate formula card and show the subtraction happening: 12 vCPUs and 48 GB per node, taken off the top, in the math. Honest numbers beat defensive talking points.</li>
+          <li><strong>The RF3 reflex.</strong> Customer insists everything needs RF3 because more copies sounds safer. Flip the selector from RF2 to RF3 in front of them and let the node range jump. Then ask the script's question: what RTO and RPO actually require surviving two simultaneous node failures? Usually the answer is a tier, not the whole estate.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">6. Limits, stated plainly</h3>
+        <ol>
+          <li>This is a pre-sizer estimate within roughly 25 percent, for conversations. Nutanix Sizer with real workload data produces proposals.</li>
+          <li>The overcommit ratios are field heuristics; the guide publishes none. Edit them to your own beliefs.</li>
+          <li>The CVM table derives from public documentation and should be re-validated against current portal specs for a design.</li>
+          <li>Compression and dedup are planning ranges until a POC measures them on the customer's actual data.</li>
+          <li>Peak IOPS, latency targets, and network design are Sizer-and-architect territory, not this tool's.</li>
+        </ol>
+        <p class="dim">Every formula sources the public field guide: <a href="https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md">appendix F, sizing rules</a>. Also see the <a href="/howto/tokenops">TokenOps manual</a>.</p>
+      </div>
+
+      <p><a href="/nutanix-sizer">Open the sizer</a> &middot; <a href="/">All calculators</a></p>
+    </div>
+  </main>
+</Base>
