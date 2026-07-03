@@ -1,0 +1,115 @@
+---
+import Base from '../../layouts/Base.astro';
+import '../../styles/tokenops.css';
+---
+<Base
+  title="How to use TokenOps - calc.nixfred.com"
+  description="The long-form field manual for TokenOps: what every input means, how to read the recommendation, and how to run it live in a customer meeting."
+>
+  <main class="tokenops-main">
+    <div class="wizard" style="max-width: 46rem;">
+      <h1>How to use TokenOps</h1>
+      <p class="dim">The field manual. Ten minutes to read, then the tool takes ninety seconds in a room. <a href="/tokenops">Open TokenOps</a>.</p>
+
+      <div class="card">
+        <h3 class="card-title">1. What this is and when to open it</h3>
+        <p>TokenOps answers the question every AI conversation eventually hits: <strong>what will this agent workload cost, and where should it run?</strong> It estimates token demand from how an agent is built, prices that demand across five providers at public list rates, derives the budget a hardware quote must come under, and scores nine placement routes with every rule visible.</p>
+        <p>Open it when you hear any of these in a meeting:</p>
+        <ol>
+          <li>"What would this AI thing actually cost us per month?"</li>
+          <li>"Should we just buy GPUs instead of paying per token?"</li>
+          <li>"Can we run this ourselves? Our data cannot leave."</li>
+          <li>"Which platform should we build the agents on?"</li>
+        </ol>
+        <p>It is a conversation tool. It is never a quote, and it says so on every surface.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">2. The chooser: two doors</h3>
+        <p>The tool opens with two buttons. Pick by how much time the room has.</p>
+        <ol>
+          <li><strong>In a meeting</strong>: a four-step wizard, about twelve inputs, two minutes to a defensible answer. Use this with a customer watching.</li>
+          <li><strong>Deep sizing</strong>: every section, every formula, every assumption on one scrolling page. Use this at your desk, before the proposal, or when an engineer wants to argue. Arguing is encouraged; the math is on screen.</li>
+        </ol>
+        <p>There is also a preset dropdown on the chooser. Starting from a preset (customer support pilot, RAG assistant, agentic coding swarm, regulated private assistant, and more) fills every input with a coherent scenario you then bend toward reality.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">3. Meeting Mode, step by step</h3>
+        <p><strong>Step 1, the use case.</strong> Name the scenario, pick the customer size, and answer the budget signal honestly. Budget matters more than it looks: if it stays Unknown, the tool will refuse to recommend a route and tell you to go do discovery instead. That refusal is a feature.</p>
+        <p><strong>Step 2, scale.</strong> Users, runs per user per day, adoption percent. Adoption is the one everybody overestimates. Fifty percent adoption of the licensed population is a realistic pilot; type what you believe, not what the sponsor hopes. Days per month appears once users are entered.</p>
+        <p><strong>Step 3, the policy gate.</strong> Can data leave the environment: Yes, With controls, or No. This single answer moves more scoring weight than anything else in the tool. Answer No and the private routes surge while public providers take a visible penalty. Follow-up questions reveal themselves based on your answer.</p>
+        <p><strong>Step 4, workload shape.</strong> Pick the agent topology (single assistant up to swarm), the prompt cache hit rate, and the retry rate. Topology is the silent cost multiplier: a planner-worker-judge shape makes about eight model calls per run where a single assistant makes one. The tool shows that math rather than hiding it.</p>
+        <p>Then the answer page: recommendation, budget ceiling, provider costs, whiteboard card, and discovery questions, all live. Every number updates if you go back and change an input.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">4. Deep sizing: the sections that matter most</h3>
+        <p>Architect Mode shows sixteen sections. All of them work; four of them decide the answer.</p>
+        <ol>
+          <li><strong>Agent topology.</strong> Calls per run by role: planners, workers, judges, retries, replans. If you only tune one section after a preset, tune this one to match how the customer's agent will actually be built.</li>
+          <li><strong>Token anatomy per role.</strong> Input and output tokens per call for each role, plus the cached input percent. Output tokens cost three to five times input tokens at every provider, so the output columns are where money hides.</li>
+          <li><strong>Data and policy gate.</strong> Twenty yes-no questions that build the private policy score. The score and its arithmetic render right below the section.</li>
+          <li><strong>Economics and the ceiling.</strong> The savings threshold (default: owned must beat tokens by 40 percent), the amortization window, and the quote slot.</li>
+        </ol>
+        <p>The other sections (RAG, tools, memory, context snowball, sizing, storage, network) add realism when the conversation goes there. Every one renders its formulas inline, always expanded.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">5. Reading the recommendation card</h3>
+        <ol>
+          <li><strong>Route scores, 0 to 100.</strong> Nine routes from direct provider to owned hardware, each scored by visible weighted rules. The bars are comparable at a glance; the "rules that fired" list below them is your talking track.</li>
+          <li><strong>Two viable routes.</strong> When the top two land within ten points, the tool refuses to fake certainty and presents both with the tradeoff stated. Read that line to the customer verbatim; it starts the right conversation.</li>
+          <li><strong>Do not size yet.</strong> If the policy gate, usage volume, or budget signal is missing, this beats every route and lists exactly what discovery is owed. Do not fight it. It is right.</li>
+          <li><strong>Missing data, primary risk, primary lever.</strong> Every recommendation names what would change it: no quote entered, no measured benchmark, estimated usage. Confidence shows High, Medium, or Low with the averaging math printed under it.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">6. The hardware budget ceiling, the number that wins meetings</h3>
+        <p>TokenOps never prices hardware. It inverts the question: given what the token route costs per month, and requiring ownership to beat it by the threshold, <strong>the recommended configuration must come in under a specific dollar figure</strong>. That figure is the big number on the economics card.</p>
+        <p>Use it exactly like this: when a customer gets a hardware quote, type it into the quote slot. The tool answers UNDER or OVER, by how much, instantly. Under means ownership genuinely beats tokens by your margin. Over means negotiate or stay on tokens. The break-even chart below it shows the crossover volume, and both lines use the same billed-token math, so the chart always agrees with the sentence.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">7. Levers, rates, and sliders</h3>
+        <ol>
+          <li><strong>Optimization levers.</strong> Each lever (raise cache hits, route workers to the mini tier, cap retries, summarize tool results) recomputes the entire model with the change applied and reports real dollars. A lever that cannot be computed honestly says so instead of guessing.</li>
+          <li><strong>Provider rates.</strong> Every price cell is editable. Type the customer's negotiated rate and the row marks itself user supplied. Rows older than 60 days flag themselves STALE.</li>
+          <li><strong>Scoring weights.</strong> Every weight behind the routes, including the policy points and the co-recommend margin, is a drag bar with a reviewed default. Drag one in front of a skeptical architect and watch the routes reorder live. Reset restores the reviewed defaults.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">8. Three meeting plays</h3>
+        <ol>
+          <li><strong>The token bill shock.</strong> Customer's OpenAI bill tripled. Meeting Mode, their real usage numbers, then straight to the provider comparison and the optimization levers. The levers usually find 30 to 60 percent before anyone mentions hardware.</li>
+          <li><strong>The GPU itch.</strong> Customer wants to buy hardware because it feels cheaper. Enter their workload, show the ceiling, and hand them the number their quote must beat. Either the quote clears it (great, proceed with evidence) or it does not (you just saved them from a very expensive rack).</li>
+          <li><strong>The locked-down environment.</strong> Policy gate: data cannot leave. Watch the private routes surge and the do-not-size guard demand real usage data. The discovery questions card becomes your next-meeting agenda.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">9. Saving, sharing, exporting</h3>
+        <ol>
+          <li>Work autosaves to your browser. Named scenarios save locally; nothing ever leaves the page on its own.</li>
+          <li>Share links are created only when you click the button, and warn if a customer name would be included. The sanitized variant strips identity fields.</li>
+          <li>Exports: a customer-friendly markdown summary, the full detailed-math report with every substitution, a print report with the formula appendix, and JSON scenario save and load.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">10. What it will never do</h3>
+        <ol>
+          <li>It will never present rough math as a quote.</li>
+          <li>It will never price hardware; it tells you what hardware has to cost.</li>
+          <li>It will never hide a formula, an assumption, or a rule that fired.</li>
+          <li>It will never transmit what you type; the only external request on the whole site is a cookieless page counter, and the test harness fails the build if any other appears.</li>
+        </ol>
+        <p class="dim">Methodology and receipts: <a href="https://github.com/nixfred/calc.nixfred.com/blob/main/docs/tokenops.md">docs/tokenops.md</a>. Also see the <a href="/howto/nutanix-sizer">Nutanix Conversation Sizer manual</a>.</p>
+      </div>
+
+      <p><a href="/tokenops">Open TokenOps</a> &middot; <a href="/">All calculators</a></p>
+    </div>
+  </main>
+</Base>
