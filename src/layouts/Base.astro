@@ -1,0 +1,95 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'calc.nixfred.com',
+  description = 'Field calculators for IT infrastructure conversations. Rough math, honest assumptions, and a next action you can say out loud.',
+} = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="inner">
+        <a class="site-name" href="/">calc.nixfred.com<span class="cursor"></span></a>
+        <nav class="site-nav">
+          <a href="https://nixfred.com">nixfred.com</a>
+          <a href="https://youtube.nixfred.com">youtube</a>
+          <a href="https://github.com/nixfred/calc.nixfred.com">source</a>
+        </nav>
+      </div>
+    </header>
+
+    <slot />
+
+    <footer class="site-footer">
+      <div class="inner">
+        <p class="disclaimer">rough math for conversations. never a quote.</p>
+        <nav class="footer-links">
+          <a href="https://nixfred.com">nixfred.com</a>
+          <a href="https://youtube.nixfred.com">youtube.nixfred.com</a>
+          <a href="https://github.com/nixfred/calc.nixfred.com">source on GitHub</a>
+        </nav>
+        <p class="credit">Built by <a href="https://nixfred.com">Fred Nix</a>. Open source under the MIT license. Fixes and better math welcome by pull request.</p>
+      </div>
+    </footer>
+
+    <script>
+      // Decode/descramble effect: elements with [data-decode] resolve from
+      // glyph noise to their real text. Calculator titles re-scramble on hover.
+      const GLYPHS = '#$%&@!?*+=<>[]{}/\\|~^;:';
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function decode(el: HTMLElement, duration = 420) {
+        const original = el.dataset.text ?? el.textContent ?? '';
+        el.dataset.text = original;
+        if (reduced || !original.trim()) {
+          el.textContent = original;
+          return;
+        }
+        const start = performance.now();
+        function frame(now: number) {
+          const t = Math.min((now - start) / duration, 1);
+          const settled = Math.floor(t * original.length);
+          let out = original.slice(0, settled);
+          for (let i = settled; i < original.length; i++) {
+            const ch = original[i];
+            out += ch === ' ' ? ' ' : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+          }
+          el.textContent = out;
+          if (t < 1) requestAnimationFrame(frame);
+          else el.textContent = original;
+        }
+        requestAnimationFrame(frame);
+      }
+
+      document.querySelectorAll<HTMLElement>('[data-decode]').forEach((el, i) => {
+        const original = el.textContent ?? '';
+        el.dataset.text = original;
+        if (!reduced) {
+          el.textContent = original.replace(/\S/g, () => GLYPHS[Math.floor(Math.random() * GLYPHS.length)]);
+          setTimeout(() => decode(el), 60 + i * 90);
+        }
+      });
+
+      document.querySelectorAll<HTMLElement>('[data-scramble-hover]').forEach((el) => {
+        el.addEventListener('mouseenter', () => decode(el, 280));
+      });
+    </script>
+  </body>
+</html>

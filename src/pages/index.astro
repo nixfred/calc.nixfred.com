@@ -1,0 +1,52 @@
+---
+import Base from '../layouts/Base.astro';
+import calculators from '../data/calculators.json';
+---
+<Base>
+  <section class="hero">
+    <div class="inner">
+      <h1 data-decode>Math you can whiteboard.</h1>
+      <p class="pitch">
+        Decision calculators for IT infrastructure meetings.
+        Enter what you know. Leave with an answer, a whiteboard card,
+        a conversation script, and a next action.
+      </p>
+      <p class="promises mono">
+        <span>1.</span> no logins &nbsp; <span>2.</span> no saved data &nbsp; <span>3.</span> no fake precision
+      </p>
+    </div>
+  </section>
+
+  <section class="calc-section">
+    <p class="section-label">calculators</p>
+    <ul class="calc-list">
+      {calculators.map((c) => (
+        <li class={`calc-card ${c.status}`}>
+          <div class="calc-top">
+            <span class="calc-index mono">[{c.index}]</span>
+            <h2 class="calc-title" data-scramble-hover>{c.title}</h2>
+            <span class={`badge ${c.status === 'live' ? 'live-badge' : ''}`}>
+              {c.status === 'live' ? 'LIVE' : 'QUEUED'}
+            </span>
+          </div>
+          <p class="calc-desc">{c.oneLiner}</p>
+          <div class="calc-meta">
+            <span>{c.inputs} inputs &rarr; {c.outputs} outputs</span>
+            <span class="tags">
+              {c.tags.map((t) => <span class="tag">{t}</span>)}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="about">
+    <p class="section-label">what this is</p>
+    <ol>
+      <li>Decision tools for IT infrastructure meetings, built by a field architect.</li>
+      <li>Every calculator returns an answer, a whiteboard card, a script, and a next action.</li>
+      <li>Rough math, visible assumptions, formulas public in the source. Never a quote.</li>
+    </ol>
+  </section>
+</Base>

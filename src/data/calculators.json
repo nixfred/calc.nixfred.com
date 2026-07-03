@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "poc-readiness",
+    "index": "01",
+    "title": "Should We Run a POC",
+    "status": "queued",
+    "oneLiner": "Scores whether a deal is ready for a POC, more discovery, or a lighter evaluation.",
+    "inputs": 8,
+    "outputs": 6,
+    "tags": ["POC", "QUALIFY"]
+  },
+  {
+    "slug": "vmware-renewal-triage",
+    "index": "02",
+    "title": "VMware Renewal Triage",
+    "status": "queued",
+    "oneLiner": "Turns a renewal quote into timing, leverage, and modernization options.",
+    "inputs": 10,
+    "outputs": 6,
+    "tags": ["VMWARE", "RENEWAL"]
+  },
+  {
+    "slug": "nutanix-conversation-sizer",
+    "index": "03",
+    "title": "Nutanix Conversation Sizer",
+    "status": "queued",
+    "oneLiner": "Rough resource ranges for a conversation. Not a quote, not formal sizing.",
+    "inputs": 10,
+    "outputs": 5,
+    "tags": ["NUTANIX", "SIZING"]
+  }
+]
