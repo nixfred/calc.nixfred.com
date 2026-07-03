@@ -4,7 +4,7 @@ import '../../styles/tokenops.css';
 ---
 <Base
   title="How to use the Nutanix Conversation Sizer - calc.nixfred.com"
-  description="The long-form field manual for the Nutanix Conversation Sizer: every input explained, how the node range is built, and how to run it in a live customer conversation."
+  description="The long-form field manual for the Nutanix Conversation Sizer: every input explained, how the node range is built, and how to run it in a live Customer conversation."
 >
   <main class="tokenops-main">
     <div class="wizard" style="max-width: 46rem;">
@@ -27,12 +27,12 @@ import '../../styles/tokenops.css';
       <div class="card">
         <h3 class="card-title">2. The inputs, in the order that matters</h3>
         <p><strong>Workload preset first.</strong> General virtualization, VDI, or Database. The preset sets four things at once: the vCPU-to-physical-core ratio, compression and dedup expectations, and the CVM profile. Presets are honest starting points, not answers; every value stays editable after you pick one.</p>
-        <p><strong>The estate.</strong> VM count, average vCPU, average RAM, used storage in TB. Averages are fine here; that is what a conversation-grade estimate means. If the customer has RVTools-style actuals, even better, type those.</p>
+        <p><strong>The estate.</strong> VM count, average vCPU, average RAM, used storage in TB. Averages are fine here; that is what a conversation-grade estimate means. If the Customer has RVTools-style actuals, even better, type those.</p>
         <p><strong>Growth.</strong> Annual percent and the sizing window, default 24 months. The guide's rule: size for 18 to 24 months of growth, then plan to add nodes. Sizing for five years buys idle hardware; sizing for today fills the cluster the day the growth arrives.</p>
         <p><strong>Data protection.</strong> RF2, RF3, or erasure coding. This is the biggest storage lever in the tool:</p>
         <ol>
           <li>RF2: 50 percent of raw is usable, tolerates one node failure, three-node minimum. The default answer for most estates.</li>
-          <li>RF3: 33 percent usable, tolerates two simultaneous failures, five-node minimum. Costs a third more raw capacity than RF2, so make the customer earn it: what are the actual RTO and RPO requirements, and what does the backup layer already cover?</li>
+          <li>RF3: 33 percent usable, tolerates two simultaneous failures, five-node minimum. Costs a third more raw capacity than RF2, so make the Customer earn it: what are the actual RTO and RPO requirements, and what does the backup layer already cover?</li>
           <li>EC-X 4+1 and 4+2: 80 and 67 percent usable, for cold and archival data, with six and seven node minimums. Not for hot latency-sensitive workloads.</li>
         </ol>
         <p><strong>The CVM profile.</strong> Light (8 vCPU / 32 GB), Standard (12 / 48), Heavy (16 / 64). This is the storage controller running on every node, and the tool subtracts it from usable resources before a single guest VM lands. When a competitor calls it overhead, the honest answer is yes, and here it is with numbers.</p>
@@ -78,7 +78,7 @@ import '../../styles/tokenops.css';
           <li>This is a pre-sizer estimate within roughly 25 percent, for conversations. Nutanix Sizer with real workload data produces proposals.</li>
           <li>The overcommit ratios are field heuristics; the guide publishes none. Edit them to your own beliefs.</li>
           <li>The CVM table derives from public documentation and should be re-validated against current portal specs for a design.</li>
-          <li>Compression and dedup are planning ranges until a POC measures them on the customer's actual data.</li>
+          <li>Compression and dedup are planning ranges until a POC measures them on the Customer's actual data.</li>
           <li>Peak IOPS, latency targets, and network design are Sizer-and-architect territory, not this tool's.</li>
         </ol>
         <p class="dim">Every formula sources the public field guide: <a href="https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md">appendix F, sizing rules</a>. Also see the <a href="/howto/tokenops">TokenOps manual</a>.</p>
