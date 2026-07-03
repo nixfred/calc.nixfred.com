@@ -1,0 +1,25 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/tokenops.css';
+---
+<Base
+  title="Nutanix Conversation Sizer - calc.nixfred.com"
+  description="Rough Nutanix cluster sizing for live conversations, from the public NutaNIX field guide. Ranges on purpose, CVM tax paid, every formula visible. Not a quote, not formal sizing."
+>
+  <div class="tokenops-summary hidden" id="tokenops-summary" aria-live="polite"></div>
+  <main class="tokenops-main">
+    <div class="wizard" style="max-width: 60rem;">
+      <h1 style="margin-bottom:0.2rem;">Nutanix Conversation Sizer</h1>
+      <p class="dim">Sizer is the source of truth. This gets the conversation within roughly 25 percent, honestly.</p>
+      <div id="sizer-root">
+        <noscript><p>This calculator runs entirely in your browser and needs JavaScript. Nothing you enter leaves the page.</p></noscript>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    import { createSizer } from '../lib/nutanix-sizer/app.js';
+    const root = document.getElementById('sizer-root');
+    (window as any).__sizer = createSizer(root, document.getElementById('tokenops-summary'));
+  </script>
+</Base>
