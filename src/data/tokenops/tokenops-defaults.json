@@ -133,6 +133,7 @@
   "traceRetentionDays": 90,
   "avgBytesPerTokenInTrace": 6,
 
+  "modelSizeQuickPick": "70",
   "modelParamsB": 70,
   "quantization": "fp8",
   "modelInstances": 1,

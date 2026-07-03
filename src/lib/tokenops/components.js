@@ -28,12 +28,14 @@ export function formulaTrace(t, sources) {
     `<tr><td class="mono">${esc(v.symbol)}</td><td>${esc(v.label)}</td><td class="mono num">${typeof v.value === 'number' ? fmt(v.value) : esc(v.value ?? 'unknown')}${v.unit ? ' ' + esc(v.unit) : ''}</td><td class="dim">${esc(v.source)}${v.editable && !String(v.source).includes('editable') ? ' &middot; editable' : ''}</td></tr>`
   ).join('');
   return `
-  <div class="ftrace" data-trace="${esc(t.id)}" aria-expanded="true">
+  <div class="ftrace" data-trace="${esc(t.id)}" data-expanded="true" role="group" aria-label="${esc(t.title)} formula">
     <div class="ft-head">
       <span class="ft-result mono">${typeof t.result === 'number' ? fmt(t.result) : 'unknown'}${t.resultUnit ? ` <span class="dim">${esc(t.resultUnit)}</span>` : ''}</span>
       <span class="ft-title">${esc(t.title)}</span>
       <span class="ft-actions">
-        <button class="copy-btn" data-copy="${esc(`${t.title}: ${fmt(t.result)} ${t.resultUnit}\n${t.algebra}\n${t.substitution}`)}">copy</button>
+        <button class="copy-btn" data-copy="${esc(String(t.algebra))}">copy formula</button>
+        <button class="copy-btn" data-copy="${esc(`${fmt(t.result)} ${t.resultUnit}`)}">copy result</button>
+        <button class="copy-btn" data-copy="${esc(`### ${t.title}\n${t.shortAnswer}\n1. Algebra: ${t.algebra}\n2. Substitution: ${t.substitution}\n3. Result: ${fmt(t.result)} ${t.resultUnit}`)}">copy markdown</button>
       </span>
     </div>
     <p class="ft-answer">${esc(t.shortAnswer)}</p>
@@ -80,10 +82,47 @@ export function recommendationCard(rec, conf, sources = []) {
     ${rec.second ? `<p class="rec-tie">Within the co-recommend margin. The tradeoff, stated: ${esc(rec.top.label)} leads on ${esc(rec.top.components[0]?.label ?? 'fit')}; ${esc(rec.second.label)} leads on ${esc(rec.second.components[0]?.label ?? 'fit')}.</p>` : ''}
     <div class="route-grid">${rec.routes.map((r, i) => scoreRow(r, i === 0 ? 'top' : (rec.second && r.key === rec.second.key ? 'tie' : ''))).join('')}</div>
     <div class="route-sources"><span class="k">route sources</span>${sourceLinkPills([...new Set(rec.routes.flatMap((r) => r.sourceIds))], sources)}</div>
+    ${warningsHtml(rec.warnings)}
     <div class="rec-rules"><span class="k">rules that fired</span><ol>${rec.rulesFired.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>
+    ${rec.missingData?.length ? `<div class="rec-rules"><span class="k">missing data</span><ol>${rec.missingData.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>` : ''}
+    ${rec.primaryRisk ? `<p class="rec-next"><span class="k">primary risk</span> ${esc(rec.primaryRisk)}</p>` : ''}
+    ${rec.primaryLever ? `<p class="rec-next"><span class="k">primary optimization lever</span> ${esc(rec.primaryLever)}</p>` : ''}
     <p class="rec-conf"><span class="k">confidence</span> ${esc(conf.band)} <span class="mono dim">(${fmt(conf.avg, 2)}/3)</span>${conf.reasons.length ? ` &middot; ${esc(conf.reasons.join(' '))}` : ''}</p>
     <p class="rec-conf-sub mono dim">${esc(conf.substitution)}</p>
     <p class="rec-next"><span class="k">next action</span> ${esc(rec.nextAction)}</p>
+  </div>`;
+}
+
+export function optimizationCard(levers) {
+  if (!levers?.length) return '';
+  return `<div class="card">
+    <h3 class="card-title">Optimization levers</h3>
+    <p class="dim">Each lever recomputes the whole model with the change applied. Dollar effects, not vibes.</p>
+    <ol>${levers.map((l) => `<li><b>${esc(l.label)}</b>: saves <span class="mono">${money(l.savings)}</span> per month. <span class="dim">${esc(l.note)}</span><br><span class="mono dim">${esc(l.substitution)}</span></li>`).join('')}</ol>
+  </div>`;
+}
+
+export function fabricRulesCard(gpuCount, sources) {
+  const rules = [
+    { id: 1, when: gpuCount <= 1, text: 'Single server, single GPU: host networking plus a management network. No backend fabric needed.' },
+    { id: 2, when: gpuCount >= 2 && gpuCount <= 8, text: 'Two to eight GPUs in one dense server: intra-server interconnect carries the load; plan 100 to 400 GbE for data-path and storage traffic depending on platform and benchmark need.' },
+    { id: 3, when: gpuCount > 8, text: 'More than eight GPUs means multiple servers and distributed inference: high speed backend fabric planning is REQUIRED, not optional.' },
+    { id: 4, when: false, text: 'Multi node training or fine tuning: formal fabric design with the platform vendor.' },
+  ];
+  return `<div class="card">
+    <h3 class="card-title">Backend fabric rules</h3>
+    <p class="dim">Token throughput alone does not size the backend fabric. Rule-based guidance, confidence: field rule of thumb.</p>
+    <ol>${rules.map((r) => `<li class="${r.when ? 'fabric-fired' : 'dim'}">${r.when ? '&#9656; ' : ''}${esc(r.text)}${r.when ? ' <span class="mono">(this rule fired)</span>' : ''}</li>`).join('')}</ol>
+    ${sourceLinkPills(['field_heuristic', 'vllm_optimization'], sources)}
+  </div>`;
+}
+
+export function policyScoreTrace(pol, sources) {
+  return `<div class="ftrace" data-trace="privatePolicyScore" data-expanded="true">
+    <div class="ft-head"><span class="ft-result mono">${fmt(pol.score)} <span class="dim">points</span></span><span class="ft-title">Private policy score</span></div>
+    <p class="ft-answer">A higher private policy score pushes the recommendation toward private execution routes.</p>
+    <p class="ft-algebra mono"><span class="k">algebra</span> privatePolicyScore = ${pol.parts.length ? pol.parts.map((p) => p[1]).join(' + ') : '0'} = ${fmt(pol.score)}</p>
+    ${pol.parts.length ? `<table class="ft-vars"><thead><tr><th>condition</th><th>points</th></tr></thead><tbody>${pol.parts.map((p) => `<tr><td>${esc(p[0])}</td><td class="mono num">${p[1]}</td></tr>`).join('')}</tbody></table>` : '<p class="dim">No private-pressure conditions active.</p>'}
   </div>`;
 }
 
@@ -109,16 +148,19 @@ export function providerTable(cmp, providerMeta, sources) {
 }
 
 export function ratesPanel(rates, providerMeta, sources) {
-  const rows = rates.map((r, i) => `
+  const rows = rates.map((r, i) => {
+    const stale = r.lastReviewed && (Date.now() - new Date(r.lastReviewed).getTime()) > 60 * 86400000;
+    return `
     <tr>
       <td>${esc(providerMeta[r.providerKey]?.label ?? r.providerKey)}</td>
-      <td>${esc(r.model)}${r.userSupplied ? ' <span class="tag-user">user supplied</span>' : ''}</td>
+      <td>${esc(r.model)}${r.userSupplied ? ' <span class="tag-user">user supplied</span>' : ''}${stale ? ' <span class="tag-user">STALE, re-verify</span>' : ''}</td>
       <td class="dim">${esc(r.tier)}</td>
-      <td><input type="number" step="0.01" min="0" data-rate="${i}" data-ratefield="inputPerMillion" value="${r.inputPerMillion ?? ''}"></td>
-      <td><input type="number" step="0.01" min="0" data-rate="${i}" data-ratefield="cachedInputPerMillion" value="${r.cachedInputPerMillion ?? ''}"></td>
-      <td><input type="number" step="0.01" min="0" data-rate="${i}" data-ratefield="outputPerMillion" value="${r.outputPerMillion ?? ''}"></td>
+      <td><input type="number" step="0.01" min="0" aria-label="${esc(r.model)} input price per million" data-rate="${i}" data-ratefield="inputPerMillion" value="${r.inputPerMillion ?? ''}"></td>
+      <td><input type="number" step="0.01" min="0" aria-label="${esc(r.model)} cached input price per million" data-rate="${i}" data-ratefield="cachedInputPerMillion" value="${r.cachedInputPerMillion ?? ''}"></td>
+      <td><input type="number" step="0.01" min="0" aria-label="${esc(r.model)} output price per million" data-rate="${i}" data-ratefield="outputPerMillion" value="${r.outputPerMillion ?? ''}"></td>
       <td>${sourceLinkPills([r.sourceId], sources)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   return `<div class="card" id="rates-panel">
     <h3 class="card-title">Provider rates (USD per million tokens)</h3>
     <p class="dim">Public list prices as editable defaults. Edit any cell for negotiated pricing; edited rows are marked user supplied and lose their source claim. Rows older than 60 days show STALE.</p>
@@ -142,7 +184,9 @@ export function hardwareCards(hardware, state, sources) {
         <li>Pricing: user supplied quote required</li>
       </ol>
       ${h.notes ? `<p class="dim hw-notes">${esc(h.notes)}</p>` : ''}
+      ${h.benchNote ? `<p class="dim hw-notes">${esc(h.benchNote)}</p>` : ''}
       ${sourceLinkPills([h.sourceId], sources)}
+      ${h.benchSources?.length ? `<div class="src-pills">${h.benchSources.map((u) => `<a class="src-pill" href="${esc(u)}" target="_blank" rel="noopener">benchmark source</a>`).join('')}</div>` : ''}
       ${h.category === 'GPU' ? `<button class="pick-hw" data-pick="${esc(h.id)}">${state.gpuChoice === h.id ? 'selected for sizing' : 'use for sizing'}</button>` : ''}
     </div>`).join('');
   return `<div class="card"><h3 class="card-title">Hardware candidates</h3>

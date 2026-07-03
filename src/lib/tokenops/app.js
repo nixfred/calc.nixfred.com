@@ -4,8 +4,8 @@
 
 import { engine } from './formulas.js';
 import { validateInputs, fmt, money } from './engine.js';
-import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost } from './costs.js';
-import { recommend, confidence, discoveryQuestions } from './routes.js';
+import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers } from './costs.js';
+import { recommend, confidence, discoveryQuestions, privatePolicyScore } from './routes.js';
 import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LABELS } from './sections.js';
 import * as C from './components.js';
 import * as X from './exports.js';
@@ -64,13 +64,22 @@ export function createApp(root, data) {
     const cmp = providerComparison(state, values, rates, Object.keys(providerMeta));
     const providerBaseline = state.ceilingBaseline === 'selected' && selected.total > 0 ? selected.total : (cmp.min ?? selected.total ?? 0);
     const ceiling = hardwareCeiling(state, providerBaseline);
-    const be = breakEvenTokens(state, values, rates, providerBaseline);
-    const rented = rentedGpuCost(state);
+    const be = breakEvenTokens(state, values, providerBaseline, selected.billedTokens);
+    const costPerM = selected.billedTokens > 0 ? selected.total / (selected.billedTokens / 1e6) : null;
+    const rented = rentedGpuCost(state, costPerM);
     const caching = selected.total > 0 ? cachingSavings(state, values, rates) : null;
+    const levers = selected.total > 0 ? optimizationLevers(state, values, rates, selected.total, (patched) => engine.evaluate(patched, { hardware }).values) : [];
     const rec = recommend(state, values, rules, { providerMonthlyCost: providerBaseline, usageVersusBreakEven: be.usageVersusBreakEven ?? 0 }, weightOverrides);
-    const conf = confidence(state, values);
+    const conf = confidence(state, values, rates);
+    // Exec card extras (spec 33.1): primary risk and primary optimization lever.
+    rec.primaryRisk = rec.warnings?.length ? rec.warnings[0].message
+      : state.usageConfidence !== 'measured' ? 'Usage is estimated; the whole cost picture moves with it.'
+      : state.userBenchmarkTpsPerGpu == null ? 'Throughput sizing rests on a labeled benchmark estimate.'
+      : 'Public list pricing may not match contract pricing.';
+    if (levers.length) rec.primaryLever = `${levers[0].label} (saves about ${Math.round(levers[0].savings).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} per month).`;
     const disc = discoveryQuestions(state);
-    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, rec, conf, disc };
+    const policy = privatePolicyScore(state, rules, weightOverrides);
+    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy };
   }
 
   /* ---------- field rendering ---------- */
@@ -83,7 +92,7 @@ export function createApp(root, data) {
     if (f.kind === 'number') control = `<input id="${id}" type="number" data-field="${esc(f.key)}" value="${val ?? ''}" ${f.min !== undefined ? `min="${f.min}"` : ''} ${f.max !== undefined ? `max="${f.max}"` : ''} step="${f.step ?? 'any'}">`;
     else if (f.kind === 'text') control = `<input id="${id}" type="text" data-field="${esc(f.key)}" value="${esc(val ?? '')}">`;
     else if (f.kind === 'toggle') control = `<button id="${id}" type="button" class="toggle ${val ? 'on' : ''}" role="switch" aria-checked="${!!val}" data-field="${esc(f.key)}" data-toggle="1">${val ? 'yes' : 'no'}</button>`;
-    else if (f.kind === 'likert') control = `<div class="likert" role="radiogroup" aria-label="${esc(f.label)}">${LIKERT_LABELS.map((l, i) => `<button type="button" class="lik ${val === i ? 'on' : ''}" data-field="${esc(f.key)}" data-likert="${i}">${l}</button>`).join('')}</div>`;
+    else if (f.kind === 'likert') control = `<div class="likert" role="radiogroup" aria-label="${esc(f.label)}">${LIKERT_LABELS.map((l, i) => `<button type="button" role="radio" aria-checked="${val === i}" class="lik ${val === i ? 'on' : ''}" data-field="${esc(f.key)}" data-likert="${i}">${l}</button>`).join('')}</div>`;
     else if (f.kind === 'select') {
       let choices = f.choices;
       if (choices === 'PROVIDERS') choices = Object.entries(providerMeta).map(([k, m]) => [k, m.label]);
@@ -99,7 +108,7 @@ export function createApp(root, data) {
       workloads: ['ragMonthlyTokens', 'agentsMonthlyTokens', 'codingMonthlyTokens', 'agenticCodingMonthlyTokens'],
       volume: ['monthlyRuns'],
       topology: ['baseCallsPerRun', 'retryCallsPerRun', 'replanCallsPerRun', 'totalCallsPerRun'],
-      anatomy: ['contextSnowballTokensPerCall', 'inputTokensPerRun', 'outputTokensPerRun', 'agentMonthlyInputTokens', 'agentMonthlyOutputTokens', 'cachedInputTokensMonthly', 'uncachedInputTokensMonthly', 'totalMonthlyTokens', 'weightedTokensPerMinute', 'calendarTokensPerMinute', 'weightedTokensPerSecond'],
+      anatomy: ['contextSnowballTokensPerCall', 'inputTokensPerRun', 'outputTokensPerRun', 'agentMonthlyInputTokens', 'agentMonthlyOutputTokens', 'cachedInputTokensMonthly', 'uncachedInputTokensMonthly', 'totalMonthlyTokens', 'weightedTokensPerMinute', 'calendarTokensPerMinute', 'weightedTokensPerSecond', 'calendarTokensPerSecond'],
       snowball: [],
       rag: ['chunksPerDocument', 'retrievedContextTokens', 'vectorRecords', 'monthlyEmbeddingTokens'],
       tools: ['toolSchemaOverheadPerCall', 'toolResultTokensPerRun'],
@@ -109,7 +118,9 @@ export function createApp(root, data) {
       network: ['userResponseBandwidthMbps', 'ragTrafficMbps', 'toolTrafficMbps', 'totalApplicationNetworkMbps'],
     };
     const ids = bySection[sectionId] ?? [];
-    return ids.map((id) => C.formulaTrace(cx.traces[id], sources)).join('');
+    let html = ids.map((id) => C.formulaTrace(cx.traces[id], sources)).join('');
+    if (sectionId === 'policy') html += C.policyScoreTrace(cx.policy, sources);
+    return html;
   }
 
   function errorsHtml(errors) {
@@ -148,19 +159,43 @@ export function createApp(root, data) {
     const parts = [
       C.recommendationCard(cx.rec, cx.conf, sources),
       econ,
+      C.optimizationCard(cx.levers),
       C.providerTable(cx.cmp, providerMeta, sources),
       wb,
       C.discoveryCard(cx.disc),
     ];
     if (!meeting) {
-      parts.splice(3, 0, C.hardwareCards(hardware, state, sources));
+      parts.splice(4, 0, C.hardwareCards(hardware, state, sources));
+      parts.splice(5, 0, C.fabricRulesCard(cx.values.recommendedGpuCount ?? 1, sources));
       parts.push(C.ratesPanel(rates, providerMeta, sources));
       parts.push(C.weightSliders(rules, weightOverrides));
+      parts.push(C.assumptionsPanel(assumptionItems()));
       parts.push(exportPanel());
     } else {
       parts.push(`<p class="dim center">Need every section and every assumption? <button class="linklike" data-goto="architect">Switch to Architect Mode</button></p>`);
     }
     return parts.join('');
+  }
+
+  function assumptionItems() {
+    return [
+      { label: 'Tokens per RAG session per minute', value: state.ragTokensPerSessionMin, reason: 'Field sizing heuristic, editable in Workload types.' },
+      { label: 'Tokens per agent workflow per minute', value: state.agentTokensPerWorkflowMin, reason: 'Field sizing heuristic, editable in Workload types.' },
+      { label: 'Tokens per coding developer hour', value: state.codingTokensPerDevHour, reason: 'Field sizing heuristic, editable in Workload types.' },
+      { label: 'Tokens per agentic coding developer hour', value: state.agenticCodingTokensPerDevHour, reason: 'Field sizing heuristic, editable in Workload types.' },
+      { label: 'Cached input percent', value: state.cachedInputPercent + '%', reason: 'Prompt cache hit expectation; edit in Token anatomy.' },
+      { label: 'Retry rate', value: state.retryRatePercent + '%', reason: 'Share of calls retried; edit in Agent topology.' },
+      { label: 'Batch eligible percent', value: state.batchEligiblePercent + '%', reason: 'Share of tokens billed at the batch discount when the provider offers one.' },
+      { label: 'Average bytes per token', value: state.avgBytesPerToken, reason: 'Network sizing conversion; edit in Network.' },
+      { label: 'Bytes per vector record', value: state.bytesPerVectorRecord, reason: 'Legacy vector DB heuristic; edit in Storage.' },
+      { label: 'Chunk size / overlap', value: `${state.chunkSize} / ${state.chunkOverlap}`, reason: 'RAG chunking; edit in RAG and retrieval.' },
+      { label: 'Runtime overhead', value: state.runtimeOverheadPercent + '%', reason: 'Serving engine memory overhead; edit in Sizing.' },
+      { label: 'Safety margin', value: state.safetyMarginPercent + '%', reason: 'Headroom on the memory stack; edit in Sizing.' },
+      { label: 'GPU memory utilization target', value: state.gpuMemoryUtilizationTarget, reason: 'Usable share of raw VRAM; edit in Sizing.' },
+      { label: 'Target GPU utilization', value: state.targetGpuUtilization, reason: 'Throughput derating; edit in Sizing.' },
+      { label: 'Useful life months', value: state.usefulLifeMonths, reason: 'Capex amortization window; edit in Economics.' },
+      { label: 'Required savings threshold', value: Math.min(90, Math.max(0, state.savingsThresholdPercent)) + '%', reason: 'Owned hardware must beat tokens by this margin; edit in Economics.' },
+    ];
   }
 
   function exportPanel() {
@@ -244,6 +279,7 @@ export function createApp(root, data) {
         <div class="a-body">
           <div class="btn-row"><button data-goto="chooser">mode chooser</button>
             <select id="preset-select"><option value="">apply preset...</option>${Object.entries(WORKLOAD_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('')}</select>
+            <button id="reset-all">reset to defaults</button>
           </div>
           ${errorsHtml(cx.errors)}
           ${secs}
@@ -317,6 +353,7 @@ export function createApp(root, data) {
     if (t.tagName === 'SELECT' && t.dataset.field) {
       setPath(state, t.dataset.field, t.value);
       if (t.dataset.field === 'topologyType' && TOPOLOGY_PRESETS[t.value]) Object.assign(state, TOPOLOGY_PRESETS[t.value]);
+      if (t.dataset.field === 'modelSizeQuickPick' && t.value) state.modelParamsB = Number(t.value);
       if (view === 'architect') render(); else debouncedRefresh();
     }
     if (t.id === 'preset-select' && t.value) {
@@ -360,10 +397,11 @@ export function createApp(root, data) {
     }
     if (b.dataset.pick) { state.gpuChoice = b.dataset.pick; refreshResults(); return; }
     if (b.id === 'reset-weights') { weightOverrides = {}; render(); return; }
+    if (b.id === 'reset-all') { state = structuredClone(data.defaults); weightOverrides = {}; render(); return; }
     if (b.dataset.export) handleExport(b.dataset.export);
   });
 
-  function handleExport(kind) {
+  function exportContext() {
     const cx = compute();
     const totals = {
       monthlyRuns: cx.values.monthlyRuns ?? 0,
@@ -372,7 +410,15 @@ export function createApp(root, data) {
       costMin: cx.cmp.min, costMax: cx.cmp.max,
       costPerRun: cx.values.monthlyRuns ? cx.providerBaseline / cx.values.monthlyRuns : null,
     };
-    const ctx = { state, rec: cx.rec, conf: cx.conf, totals, ceiling: cx.ceiling, be: cx.be, traces: cx.traces, rates, hardware, sources, version: VERSION, weightOverrides };
+    // Detailed export and print must include the economics math too (audit
+    // finding: ceiling, break even, caching, and rented traces were omitted).
+    const allTraces = { ...cx.traces };
+    for (const t of [...cx.ceiling.traces, cx.be, cx.caching, cx.rented].filter(Boolean)) allTraces[t.id] = t;
+    return { cx, ctx: { state, rec: cx.rec, conf: cx.conf, totals, ceiling: cx.ceiling, be: cx.be, traces: allTraces, rates, hardware, sources, version: VERSION, weightOverrides, levers: cx.levers, assumptions: assumptionItems() } };
+  }
+
+  function handleExport(kind) {
+    const { ctx } = exportContext();
     const warnName = X.customerNameWarning(state);
     if (kind === 'summary') { if (warnName && !confirm(warnName)) return; X.download('tokenops-summary.md', X.customerSummaryMarkdown(ctx)); }
     if (kind === 'math') { if (warnName && !confirm(warnName)) return; X.download('tokenops-detailed-math.md', X.detailedMathMarkdown(ctx)); }
@@ -416,11 +462,23 @@ export function createApp(root, data) {
       ${Object.values(ctx.traces).map((t) => `<div class="p-formula"><h3>${esc(t.title)}: ${fmt(t.result)} ${esc(t.resultUnit)}</h3><p>${esc(t.plainEnglish)}</p><p class="mono">${esc(t.algebra)}</p><p class="mono">${esc(t.substitution)}</p>${t.assumptions.map((a) => `<p>Assumption: ${esc(a)}</p>`).join('')}${t.warnings.map((w) => `<p>Warning (${esc(w.severity)}): ${esc(w.message)}</p>`).join('')}</div>`).join('')}
       <h2>Sources</h2>
       <ol>${sources.map((s) => `<li>${esc(s.label)} (reviewed ${esc(s.lastReviewed)}): ${esc(s.url)}</li>`).join('')}</ol>
-      <p class="p-footer">Directional sizing and placement estimate. Not a vendor quote. &middot; calc.nixfred.com/tokenops &middot; ${new Date().toISOString().slice(0, 10)} &middot; TokenOps ${VERSION} &middot; Built by Fred Nix</p>`;
+      <p class="p-footer">Directional sizing and placement estimate. Not a vendor quote. &middot; calc.nixfred.com/tokenops &middot; ${new Date().toISOString().slice(0, 10)} &middot; TokenOps ${VERSION} &middot; oldest source review ${esc(oldest)} &middot; Built by Fred Nix</p>`;
   }
 
   window.addEventListener('beforeunload', () => X.persistence.autosave(state, weightOverrides));
 
   render();
-  return { compute, getState: () => state };
+  return {
+    compute,
+    getState: () => state,
+    // Test handles: the audit harness exercises exports and share links
+    // through these instead of trusting that buttons exist.
+    _test: {
+      exportSummary: () => X.customerSummaryMarkdown(exportContext().ctx),
+      exportMath: () => X.detailedMathMarkdown(exportContext().ctx),
+      exportJson: () => X.scenarioJson(state, weightOverrides, VERSION),
+      shareLink: () => X.shareLink(state, weightOverrides),
+      reset: () => { state = structuredClone(data.defaults); weightOverrides = {}; render(); },
+    },
+  };
 }

@@ -5,46 +5,62 @@
    All functions return FormulaTrace-shaped objects so no math hides. */
 
 import { fmt, money } from './engine.js';
-import { ROLE_LIST, roleCallsPerRun } from './formulas.js';
+import { ROLE_LIST, effectiveRolePlan } from './formulas.js';
 
 export function findRate(rates, provider, tier) {
   return rates.find((r) => r.providerKey === provider && r.tier === tier) || null;
 }
 
 /* Monthly cost of the agent workload with each role priced on its assigned
-   provider+tier. Returns {total, perRole:[...], traces:[...]} */
+   provider+tier. Token counts come from effectiveRolePlan, the SAME source
+   the demand model uses, so every counted token is a priced token.
+   Applies batch discount (spec 15.3), regional uplift (15.4), and embedding
+   fees (15.1) on top of the base token math. */
 export function roleRoutedCost(state, values, rates) {
-  const R = values;
-  const scale = R.baseCallsPerRun > 0 ? R.totalCallsPerRun / R.baseCallsPerRun : 1;
-  const runs = R.monthlyRuns ?? 0;
+  const runs = values.monthlyRuns ?? 0;
   const cachedShare = (state.cachedInputPercent ?? 0) / 100;
+  const batchShare = (state.batchEligiblePercent ?? 0) / 100;
+  const { plan } = effectiveRolePlan(state, values);
   const perRole = [];
   let total = 0;
-  for (const role of ROLE_LIST) {
-    const calls = roleCallsPerRun(state, role) * scale;
-    const cfg = state.roles[role];
-    if (!calls || !cfg) continue;
+  for (const p of plan) {
+    const cfg = state.roles[p.role];
     const rate = findRate(rates, cfg.provider, cfg.tier);
     if (!rate || rate.inputPerMillion == null) {
-      perRole.push({ role, calls, missing: true, provider: cfg.provider, tier: cfg.tier });
+      perRole.push({ role: p.role, calls: p.calls, missing: true, provider: cfg.provider, tier: cfg.tier });
       continue;
     }
-    const inTokM = (runs * calls * cfg.inputTokensPerCall) / 1e6;
-    const outTokM = (runs * calls * (cfg.outputTokensPerCall + (cfg.reasoningTokensPerCall || 0))) / 1e6;
+    const inTokM = (runs * p.inPerRun) / 1e6;
+    const outTokM = (runs * p.outPerRun) / 1e6;
     const cachedM = inTokM * cachedShare;
     const uncachedM = inTokM - cachedM;
     const cachedPrice = rate.cachedInputPerMillion ?? rate.inputPerMillion;
-    const cost = uncachedM * rate.inputPerMillion + cachedM * cachedPrice + outTokM * rate.outputPerMillion;
+    let cost = uncachedM * rate.inputPerMillion + cachedM * cachedPrice + outTokM * rate.outputPerMillion;
+    let batchSavings = 0;
+    if (batchShare > 0 && rate.batchDiscountMultiplier != null) {
+      batchSavings = cost * batchShare * (1 - rate.batchDiscountMultiplier);
+      cost -= batchSavings;
+    }
+    const uplift = (rate.regionalUpliftPercent ?? 0) / 100;
+    if (uplift) cost *= 1 + uplift;
     perRole.push({
-      role, calls, provider: cfg.provider, tier: cfg.tier, model: rate.model,
+      role: p.role, calls: p.calls, provider: cfg.provider, tier: cfg.tier, model: rate.model,
       inputMTok: inTokM, cachedMTok: cachedM, uncachedMTok: uncachedM, outputMTok: outTokM,
       inputPrice: rate.inputPerMillion, cachedPrice, outputPrice: rate.outputPerMillion,
-      cost, sourceId: rate.sourceId, lastReviewed: rate.lastReviewed, userSupplied: !!rate.userSupplied,
-      substitution: `${money(cost)} = (${fmt(uncachedM)} MTok * ${money(rate.inputPerMillion, 2)}) + (${fmt(cachedM)} MTok * ${money(cachedPrice, 2)}) + (${fmt(outTokM)} MTok * ${money(rate.outputPerMillion, 2)})`,
+      cost, batchSavings, sourceId: rate.sourceId, lastReviewed: rate.lastReviewed, userSupplied: !!rate.userSupplied,
+      substitution: `${money(cost)} = (${fmt(uncachedM)} MTok * ${money(rate.inputPerMillion, 2)}) + (${fmt(cachedM)} MTok * ${money(cachedPrice, 2)}) + (${fmt(outTokM)} MTok * ${money(rate.outputPerMillion, 2)})${batchSavings ? ` - ${money(batchSavings)} batch discount` : ''}${uplift ? ` * ${fmt(1 + uplift, 2)} regional uplift` : ''}`,
     });
     total += cost;
   }
-  return { total, perRole };
+  // Embedding fees (spec 15.1). User-supplied price; warned when RAG is on without one.
+  let embeddingFee = 0;
+  if (state.ragEnabled && state.embeddingPricePerMillion != null && values.monthlyEmbeddingTokens) {
+    embeddingFee = (values.monthlyEmbeddingTokens / 1e6) * state.embeddingPricePerMillion;
+    total += embeddingFee;
+  }
+  // Billable agent tokens this cost actually covers (for cost-per-million math).
+  const billedTokens = runs * plan.reduce((a, p) => a + p.inPerRun + p.outPerRun, 0);
+  return { total, perRole, embeddingFee, billedTokens };
 }
 
 /* Same workload priced entirely inside one provider family (role tier mapping
@@ -53,9 +69,14 @@ export function providerComparison(state, values, rates, providerKeys) {
   const rows = [];
   for (const pk of providerKeys) {
     const saved = {};
-    for (const role of ROLE_LIST) { saved[role] = state.roles[role]?.provider; if (state.roles[role]) state.roles[role] = { ...state.roles[role], provider: pk }; }
-    const { total, perRole } = roleRoutedCost(state, values, rates);
-    for (const role of ROLE_LIST) if (state.roles[role]) state.roles[role] = { ...state.roles[role], provider: saved[role] };
+    let out;
+    try {
+      for (const role of ROLE_LIST) { saved[role] = state.roles[role]?.provider; if (state.roles[role]) state.roles[role] = { ...state.roles[role], provider: pk }; }
+      out = roleRoutedCost(state, values, rates);
+    } finally {
+      for (const role of ROLE_LIST) if (state.roles[role]) state.roles[role] = { ...state.roles[role], provider: saved[role] };
+    }
+    const { total, perRole } = out;
     const missing = perRole.some((r) => r.missing);
     const runs = values.monthlyRuns ?? 0;
     rows.push({
@@ -76,9 +97,13 @@ export function providerComparison(state, values, rates, providerKeys) {
 export function cachingSavings(state, values, rates) {
   const { total: withCache } = roleRoutedCost(state, values, rates);
   const saved = state.cachedInputPercent;
-  state.cachedInputPercent = 0;
-  const { total: withoutCache } = roleRoutedCost(state, values, rates);
-  state.cachedInputPercent = saved;
+  let withoutCache;
+  try {
+    state.cachedInputPercent = 0;
+    withoutCache = roleRoutedCost(state, values, rates).total;
+  } finally {
+    state.cachedInputPercent = saved;
+  }
   const savings = withoutCache - withCache;
   return {
     id: 'promptCachingSavings',
@@ -102,7 +127,8 @@ export function cachingSavings(state, values, rates) {
 /* ---------- Decision 0.4: the hardware budget ceiling ---------- */
 
 export function hardwareCeiling(state, providerMonthlyCost) {
-  const threshold = 1 - (state.savingsThresholdPercent ?? 40) / 100; // 0.60
+  const pctThresh = Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40)); // clamped: >100 once produced a negative ceiling
+  const threshold = 1 - pctThresh / 100; // 0.60 at default
   const ceilingMonthly = providerMonthlyCost * threshold;
   const ceilingCapex = ceilingMonthly * state.usefulLifeMonths;
   const quote = state.gpuQuote;
@@ -151,12 +177,16 @@ export function hardwareCeiling(state, providerMonthlyCost) {
   };
 }
 
-export function breakEvenTokens(state, values, rates, providerMonthlyCost) {
+export function breakEvenTokens(state, values, providerMonthlyCost, billedTokens) {
+  // Denominator uses the tokens the cost actually covers (audit finding:
+  // dividing by totalMonthlyTokens diluted the rate whenever quick workloads
+  // were on, overstating break even and biasing routes against ownership).
+  const billedMTok = (billedTokens ?? 0) / 1e6;
   const totalMTok = (values.totalMonthlyTokens ?? 0) / 1e6;
-  const weightedCostPerMillion = totalMTok > 0 ? providerMonthlyCost / totalMTok : null;
+  const weightedCostPerMillion = billedMTok > 0 ? providerMonthlyCost / billedMTok : null;
   const monthlyBudget = state.gpuQuote != null
     ? state.gpuQuote / state.usefulLifeMonths
-    : providerMonthlyCost * (1 - (state.savingsThresholdPercent ?? 40) / 100);
+    : providerMonthlyCost * (1 - Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40)) / 100);
   const be = weightedCostPerMillion ? monthlyBudget / weightedCostPerMillion : null;
   return {
     id: 'breakEvenMillionTokens',
@@ -171,14 +201,39 @@ export function breakEvenTokens(state, values, rates, providerMonthlyCost) {
       { symbol: 'monthlyHardwareBudget', label: state.gpuQuote != null ? 'Your quote amortized monthly' : 'Ceiling monthly budget', value: monthlyBudget },
       { symbol: 'managedWeightedCostPerMillion', label: 'Managed cost per million tokens', value: weightedCostPerMillion },
     ],
-    assumptions: ['Uses your entered quote when present, otherwise the derived ceiling.'],
+    assumptions: ['Uses your entered quote when present, otherwise the derived ceiling.', 'Break even and current usage are both measured in billed agent tokens so the units match.'],
     sourceIds: [], warnings: [], section: 'economics',
-    currentMTok: totalMTok,
-    usageVersusBreakEven: be ? totalMTok / be : null,
+    currentMTok: billedMTok,
+    totalMTok,
+    usageVersusBreakEven: be ? billedMTok / be : null,
   };
 }
 
-export function rentedGpuCost(state) {
+/* Spec section 32: optimization levers, each with its dollar effect.
+   reEval re-runs the engine with a patched state so the whole chain
+   (token counts AND prices) reacts, not just the price side. */
+export function optimizationLevers(state, values, rates, currentTotal, reEval) {
+  const levers = [];
+  const tryLever = (label, patch, note) => {
+    const patched = { ...structuredClone(state), ...patch };
+    if (patch.roles) patched.roles = { ...structuredClone(state.roles), ...patch.roles };
+    const v2 = reEval(patched);
+    const { total } = roleRoutedCost(patched, v2, rates);
+    const savings = currentTotal - total;
+    if (savings > 0.5) levers.push({ label, savings, note, substitution: `${money(savings)} per month = ${money(currentTotal)} now - ${money(total)} after` });
+  };
+  if ((state.cachedInputPercent ?? 0) < 90) tryLever('Raise prompt cache hits to 90 percent', { cachedInputPercent: 90 }, 'Stable system prompts, tool schemas, and shared context make this realistic for agent workloads.');
+  if (state.roles.worker?.tier !== 'mini') tryLever('Route workers to the mini tier', { roles: { worker: { ...state.roles.worker, tier: 'mini' } } }, 'Workers do the bulk calls; judges and planners keep the premium model.');
+  if ((state.retryRatePercent ?? 0) > 5) tryLever('Cap the retry rate at 5 percent', { retryRatePercent: 5 }, 'Better tool error handling and stricter loop control.');
+  if (state.ragEnabled && state.chunksRetrievedPerQuery > 3) tryLever('Halve retrieved chunks per query', { chunksRetrievedPerQuery: Math.ceil(state.chunksRetrievedPerQuery / 2) }, 'Tighter retrieval usually costs little answer quality.');
+  if (state.toolUseEnabled && !state.toolResultSummarization) tryLever('Summarize tool results before reinjecting', { toolResultSummarization: true }, 'Raw tool output is a silent input-token driver.');
+  if (state.toolUseEnabled && state.toolsExposed > 4) tryLever('Halve the exposed tool catalog', { toolsExposed: Math.ceil(state.toolsExposed / 2) }, 'Schema overhead taxes every call before any work happens.');
+  if ((state.batchEligiblePercent ?? 0) < 80) tryLever('Batch 80 percent of background work', { batchEligiblePercent: 80 }, 'Applies the 50 percent batch discount where offered. Only honest for non-interactive work.');
+  levers.sort((a, b) => b.savings - a.savings);
+  return levers;
+}
+
+export function rentedGpuCost(state, managedCostPerMillion = null) {
   if (state.rentedGpuHourly == null) return null;
   const monthly = state.rentedGpuHourly * state.rentedGpuCount * state.rentedActiveHoursPerMonth
     + state.rentedStorageMonthly + state.rentedNetworkMonthly + state.rentedPlatformMonthly;
@@ -198,8 +253,12 @@ export function rentedGpuCost(state) {
       { symbol: 'gpuCount', label: 'GPU count', value: state.rentedGpuCount, editable: true },
       { symbol: 'activeHoursPerMonth', label: 'Active hours per month', value: state.rentedActiveHoursPerMonth, editable: true },
     ],
-    assumptions: ['Rental pricing is user supplied; TokenOps ships no rental price defaults in this release.'],
-    sourceIds: [], warnings: [], section: 'economics',
+    assumptions: [
+      'Rental pricing is user supplied; TokenOps ships no rental price defaults in this release.',
+      ...(managedCostPerMillion ? [`Rented break even: ${fmt(monthly / managedCostPerMillion)} million managed tokens per month (rented monthly cost / managed cost per million, spec 30.2).`] : []),
+    ],
+    sourceIds: ['lambda_pricing'], warnings: [], section: 'economics',
     validationCost: validation,
+    rentedBreakEvenMTok: managedCostPerMillion ? monthly / managedCostPerMillion : null,
   };
 }

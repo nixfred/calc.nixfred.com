@@ -238,7 +238,8 @@ defs.push({
     { symbol: 'chunkSize', label: 'Chunk size', value: s.chunkSize, editable: true },
     { symbol: 'chunkOverlap', label: 'Chunk overlap', value: s.chunkOverlap, editable: true },
   ],
-  compute: (v) => Math.ceil(v.documentTokens / (v.chunkSize - v.chunkOverlap)),
+  compute: (v) => (v.chunkSize - v.chunkOverlap) > 0 ? Math.ceil(v.documentTokens / (v.chunkSize - v.chunkOverlap)) : null,
+  warn: (value, v) => (v.chunkSize - v.chunkOverlap) > 0 ? [] : [{ severity: 'critical', message: 'Chunk overlap must be smaller than chunk size. Not computing garbage.' }],
   sourceIds: [],
 });
 
@@ -363,29 +364,47 @@ defs.push({
 
 /* ---------- 13.6 Token anatomy, aggregated over roles ---------- */
 
-function roleMonthly(s, R, kind) {
-  // callScale distributes retry and replan calls across roles proportionally.
-  const scale = R.baseCallsPerRun > 0 ? R.totalCallsPerRun / R.baseCallsPerRun : 1;
-  let total = 0;
+/* Single source of truth for billable tokens per run, per role.
+   Used by BOTH the demand model (roleMonthly) and the cost engine
+   (roleRoutedCost) so every counted token is also a priced token
+   (adversarial audit finding: they had diverged).
+   Attribution rules, stated: retries repeat the base role mix (retryScale);
+   replans are extra PLANNER calls only (spec 13.5); run-level extras (tool
+   results and schemas, memory reads, RAG context) are input tokens billed at
+   the WORKER rate since workers consume them; memory-write summaries are
+   output tokens billed at the summarizer's rate when one exists, else the
+   worker's. Run-level extras retry-scale like the calls that produce them. */
+export function effectiveRolePlan(s, R) {
+  const base = R.baseCallsPerRun ?? 0;
+  const retryScale = base > 0 ? (base + (R.retryCallsPerRun ?? 0)) / base : 1;
+  const extraIn = retryScale * (
+    (s.toolUseEnabled ? (R.toolResultTokensPerRun ?? 0) + (R.toolSchemaOverheadPerCall ?? 0) * ((s.toolPlanningCalls + s.toolResultSummaryCalls) || 1) : 0)
+    + (s.memoryEnabled ? (R.memoryReadTokensPerRun ?? 0) : 0)
+    + (s.ragEnabled ? (R.retrievedContextTokens ?? 0) * (s.ragCallsPerRun || 0) : 0));
+  const extraOut = retryScale * (s.memoryEnabled ? (R.memoryWriteTokensPerRun ?? 0) : 0);
+  const outRoleTarget = (s.summarizerCalls > 0 && s.roles.summarizer) ? 'summarizer' : 'worker';
+  const plan = [];
   for (const role of ROLE_LIST) {
-    const calls = roleCallsPerRun(s, role) * scale;
+    let calls = roleCallsPerRun(s, role) * retryScale;
+    if (role === 'planner') calls += R.replanCallsPerRun ?? 0;
     const r = s.roles[role];
     if (!calls || !r) continue;
     const snowball = (s.carryEnabled && (role === 'worker' || role === 'judge')) ? (R.contextSnowballTokensPerCall ?? 0) : 0;
-    const extraPerRunShare = 0; // tool/memory tokens are added at run level below
-    const inTok = r.inputTokensPerCall + snowball + extraPerRunShare;
-    const outTok = r.outputTokensPerCall + (r.reasoningTokensPerCall || 0);
-    total += calls * (kind === 'input' ? inTok : outTok);
+    plan.push({
+      role, calls,
+      inPerRun: calls * (r.inputTokensPerCall + snowball) + (role === 'worker' ? extraIn : 0),
+      outPerRun: calls * (r.outputTokensPerCall + (r.reasoningTokensPerCall || 0)) + (role === outRoleTarget ? extraOut : 0),
+    });
   }
-  // Run-level extras count as input tokens on the runs that use them.
-  if (kind === 'input') {
-    total += (s.toolUseEnabled ? (R.toolResultTokensPerRun ?? 0) + (R.toolSchemaOverheadPerCall ?? 0) * (s.toolPlanningCalls + s.toolResultSummaryCalls || 1) : 0);
-    total += (s.memoryEnabled ? (R.memoryReadTokensPerRun ?? 0) : 0);
-    total += (s.ragEnabled ? (R.retrievedContextTokens ?? 0) * (s.ragCallsPerRun || 0) : 0);
-  } else {
-    total += (s.memoryEnabled ? (R.memoryWriteTokensPerRun ?? 0) : 0);
-  }
-  return total;
+  // If no worker/summarizer roles are active, extras still count: pin to first role.
+  if (plan.length && !plan.some((p) => p.role === 'worker') && extraIn) plan[0].inPerRun += extraIn;
+  if (plan.length && !plan.some((p) => p.role === outRoleTarget) && extraOut) plan[0].outPerRun += extraOut;
+  return { plan, retryScale };
+}
+
+function roleMonthly(s, R, kind) {
+  const { plan } = effectiveRolePlan(s, R);
+  return plan.reduce((a, p) => a + (kind === 'input' ? p.inPerRun : p.outPerRun), 0);
 }
 
 defs.push({
@@ -556,6 +575,20 @@ defs.push({
     { symbol: 'weightedTokensPerMinute', label: 'Weighted tokens per minute', value: R.weightedTokensPerMinute, source: 'calculated above' },
   ],
   compute: (v) => v.weightedTokensPerMinute / 60,
+  sourceIds: [],
+});
+
+defs.push({
+  id: 'calendarTokensPerSecond', section: 'totals', unit: 'tokens per second',
+  title: 'Tokens per second (calendar average)',
+  shortAnswer: 'The always-on per-second rate.',
+  whyItMatters: 'Spec requires both methods so bursty and steady views are never conflated.',
+  plainEnglish: 'calendar tokens per minute divided by 60',
+  algebra: 'calendarTokensPerSecond = calendarTokensPerMinute / 60',
+  vars: (s, R) => [
+    { symbol: 'calendarTokensPerMinute', label: 'Calendar tokens per minute', value: R.calendarTokensPerMinute, source: 'calculated above' },
+  ],
+  compute: (v) => v.calendarTokensPerMinute / 60,
   sourceIds: [],
 });
 
@@ -783,7 +816,12 @@ defs.push({
     { symbol: 'minimumPlatformGpuCount', label: 'Platform minimum', value: s.minimumPlatformGpuCount, editable: true },
   ],
   compute: (v) => Math.max(v.gpusRequiredByMemory, v.gpusRequiredByThroughput, v.minimumPlatformGpuCount),
-  assumptions: (s) => [],
+  assumptions: (s, R) => [],
+  warn: (value, v) => {
+    const winner = value === v.gpusRequiredByMemory && v.gpusRequiredByMemory >= v.gpusRequiredByThroughput
+      ? 'MEMORY BOUND' : (value === v.gpusRequiredByThroughput ? 'THROUGHPUT BOUND' : 'PLATFORM MINIMUM BOUND');
+    return [{ severity: 'info', message: `Gate that won: ${winner} (memory ${v.gpusRequiredByMemory}, throughput ${v.gpusRequiredByThroughput}, platform minimum ${v.minimumPlatformGpuCount}).` }];
+  },
   sourceIds: [],
 });
 

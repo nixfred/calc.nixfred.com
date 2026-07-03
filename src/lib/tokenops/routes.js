@@ -32,13 +32,38 @@ function normalized(raw, max) {
   return Math.max(0, Math.min(100, Math.round((raw / max) * 100)));
 }
 
+/* Theoretical maximum raw score per route, computed from the live weight
+   values (including slider overrides) instead of hardcoded constants, so
+   normalization can never go stale (audit finding). Kind table says how each
+   weight scales at its best case. */
+const WEIGHT_KIND = {
+  likert: ['needTimeToValue', 'needQuality', 'needLowOps', 'needGovernance', 'needAgentBuilder', 'needIntegration', 'needModelRouting', 'needAudit', 'needBusinessUserCreation', 'needDataGravity', 'needOntology', 'needInternalApis', 'needEnterpriseRetrieval', 'readinessGap', 'useCaseAmbiguity', 'needVendorSelection', 'integrationComplexity', 'needGovernancePlanning', 'hpePreference', 'nvidiaPreference', 'opsReadiness'],
+  policyFactor: ['privatePolicyFactor'],
+  procurement: ['procurementFit'],
+};
+function routeMax(rules, route, overrides, directMax = 0) {
+  let max = 0;
+  for (const [k, def] of Object.entries(rules.routes[route]?.weights ?? {})) {
+    const val = overrides?.[`${route}.${k}`] ?? def.default;
+    if (WEIGHT_KIND.likert.includes(k)) max += 3 * val;
+    else if (WEIGHT_KIND.policyFactor.includes(k)) max += 100 * val;
+    else if (WEIGHT_KIND.procurement.includes(k)) max += 9 * val;
+    else if (k === 'directCarryFactor') max += directMax * val;
+    else max += val; // boolean bonuses and share-scaled gates cap at 1x weight
+  }
+  return Math.max(max, 1);
+}
+
 /* Returns [{key,label,score,raw,max,components:[{label,points}],penalties:[...]}] */
 export function scoreRoutes(state, values, rules, ctx, overrides) {
   const pol = privatePolicyScore(state, rules, overrides);
   const routes = [];
-  const push = (key, label, comps, pens, max, sourceIds) => {
+  const directMaxRef = { value: 0 };
+  const push = (key, label, comps, pens) => {
     const raw = comps.reduce((a, c) => a + c.points, 0) - pens.reduce((a, c) => a + c.points, 0);
-    routes.push({ key, label, raw, max, score: normalized(raw, max), components: comps.filter((c) => c.points !== 0), penalties: pens.filter((c) => c.points !== 0), sourceIds: sourceIds || rules.routes[key]?.sourceIds || [] });
+    const max = routeMax(rules, key, overrides, directMaxRef.value);
+    if (key === 'direct') directMaxRef.value = max;
+    routes.push({ key, label, raw, max, score: normalized(raw, max), components: comps.filter((c) => c.points !== 0), penalties: pens.filter((c) => c.points !== 0), sourceIds: rules.routes[key]?.sourceIds || [] });
   };
 
   // Direct provider
@@ -53,10 +78,10 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
       { label: `Private policy pressure (${pol.score} pts * factor)`, points: pol.score * w(rules, 'direct', 'privatePolicyFactor', overrides) },
       { label: 'Residency requirement', points: state.residencyRequired ? w(rules, 'direct', 'residencyPenalty', overrides) : 0 },
     ];
-    push('direct', rules.routes.direct.label, c, p, 105);
+    push('direct', rules.routes.direct.label, c, p);
   }
 
-  const directScore = routes[0].raw;
+  const directScore = routes.find((r) => r.key === 'direct').raw;
 
   // Cloud model service
   {
@@ -66,7 +91,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
       { label: 'Marketplace billing required', points: state.marketplaceBilling ? w(rules, 'cloud', 'marketplaceBilling', overrides) : 0 },
       { label: 'Residency friendlier than direct', points: state.residencyRequired ? w(rules, 'cloud', 'residencyFriendly', overrides) : 0 },
     ];
-    push('cloud', rules.routes.cloud.label, c, [], 124);
+    push('cloud', rules.routes.cloud.label, c, []);
   }
 
   // Airia
@@ -77,7 +102,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
     const p = [
       { label: strict ? 'Strict private execution required' : 'Data cannot leave', points: strict ? w(rules, 'airia', 'strictPrivateExecution', overrides) : (state.dataCanLeave === 'no' ? w(rules, 'airia', 'softPrivateExecution', overrides) : 0) },
     ];
-    push('airia', rules.routes.airia.label, c, p, 141);
+    push('airia', rules.routes.airia.label, c, p);
   }
 
   // Kamiwaza
@@ -90,14 +115,14 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
       { label: 'Internal API need', points: L(state.needInternalApis) * w(rules, 'kamiwaza', 'needInternalApis', overrides) },
       { label: 'Enterprise retrieval need', points: L(state.needEnterpriseRetrieval) * w(rules, 'kamiwaza', 'needEnterpriseRetrieval', overrides) },
     ];
-    push('kamiwaza', rules.routes.kamiwaza.label, c, [], 146);
+    push('kamiwaza', rules.routes.kamiwaza.label, c, []);
   }
 
   // BTG
   {
     const c = ['readinessGap', 'useCaseAmbiguity', 'needVendorSelection', 'integrationComplexity', 'needGovernancePlanning']
       .map((k) => ({ label: k.replace('need', '').replace(/([A-Z])/g, ' $1').trim(), points: L(state[k]) * w(rules, 'btg', k, overrides) }));
-    push('btg', rules.routes.btg.label, c, [], 126);
+    push('btg', rules.routes.btg.label, c, []);
   }
 
   // HPE Private Cloud AI
@@ -109,7 +134,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
       { label: 'NVIDIA preference', points: L(state.nvidiaPreference) * w(rules, 'hpePcai', 'nvidiaPreference', overrides) },
       { label: 'Operational readiness', points: L(state.opsReadiness) * w(rules, 'hpePcai', 'opsReadiness', overrides) },
     ];
-    push('hpePcai', rules.routes.hpePcai.label, c, [], 142);
+    push('hpePcai', rules.routes.hpePcai.label, c, []);
   }
 
   // Rented GPU validation
@@ -124,15 +149,19 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
     const p = [
       { label: 'Ops already ready to own', points: L(state.opsReadiness) * w(rules, 'rentedGpu', 'opsReadinessFactor', overrides) },
     ];
-    push('rentedGpu', rules.routes.rentedGpu.label, c, p, 75);
+    push('rentedGpu', rules.routes.rentedGpu.label, c, p);
   }
 
   // Owned hardware
   {
-    const useVsBe = ctx.usageVersusBreakEven ?? 0;
+    // Cost gate needs a REAL quote. Without one, break even derives from the
+    // ceiling, which derives from provider cost, making usage-vs-break-even a
+    // constant 1/threshold - a self-referential full score (audit finding).
+    const hasQuote = state.gpuQuote != null;
+    const useVsBe = hasQuote ? (ctx.usageVersusBreakEven ?? 0) : 0;
     const costGateShare = useVsBe >= 1 ? 1 : Math.max(0, useVsBe);
     const c = [
-      { label: `Cost gate (usage at ${fmt(useVsBe * 100, 0)} percent of break even)`, points: costGateShare * w(rules, 'owned', 'costGate', overrides) },
+      { label: hasQuote ? `Cost gate (usage at ${fmt(useVsBe * 100, 0)} percent of quote break even)` : 'Cost gate inert: no hardware quote entered', points: costGateShare * w(rules, 'owned', 'costGate', overrides) },
       { label: `Private policy score (${pol.score} pts * factor)`, points: pol.score * w(rules, 'owned', 'privatePolicyFactor', overrides) },
       { label: 'Steady usage pattern', points: state.usagePattern === 'steady' ? w(rules, 'owned', 'steadyUsage', overrides) : 0 },
       { label: 'Operational readiness', points: L(state.opsReadiness) * w(rules, 'owned', 'opsReadiness', overrides) },
@@ -142,7 +171,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
     const p = [
       { label: 'Usage is still estimated', points: state.usageConfidence !== 'measured' ? w(rules, 'owned', 'usageUncertaintyPenalty', overrides) : 0 },
     ];
-    push('owned', rules.routes.owned.label, c, p, 133);
+    push('owned', rules.routes.owned.label, c, p);
   }
 
   // Hybrid
@@ -155,7 +184,7 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
       { label: 'Mixed policy posture', points: state.dataCanLeave === 'with-controls' ? w(rules, 'hybrid', 'policyMixed', overrides) : 0 },
       { label: 'Route flexibility need', points: L(state.needModelRouting) * w(rules, 'hybrid', 'routeFlexibility', overrides) },
     ];
-    push('hybrid', rules.routes.hybrid.label, c, [], 75);
+    push('hybrid', rules.routes.hybrid.label, c, []);
   }
 
   return { routes: routes.sort((a, b) => b.score - a.score), policy: pol };
@@ -189,13 +218,25 @@ export function recommend(state, values, rules, ctx, overrides) {
     ...top.penalties.map((c) => `${c.label} cost ${top.label} ${fmt(c.points, 1)} points.`),
   ];
   if (tie) rulesFired.push(`${second.label} landed within ${margin} points, so both routes are viable and the tradeoff is stated instead of hidden.`);
+  // Spec 37 critical warning: leading route conflicts with the policy gate.
+  const warnings = [];
+  if (['direct', 'cloud'].includes(top.key) && state.dataCanLeave === 'no') {
+    warnings.push({ severity: 'critical', message: 'The leading route sends data to a public provider, but the policy gate says data cannot leave the customer environment. Treat private or hybrid routes as the real candidates.' });
+    rulesFired.push('Policy conflict: leading route allows data to leave; the gate forbids it.');
+  }
+  // Spec 31.10.7: missing data shown on every recommendation, not only do-not-size.
+  const missingData = [];
+  if (state.gpuQuote == null) missingData.push('No hardware quote entered, so the owned-hardware cost gate is inert.');
+  if (state.userBenchmarkTpsPerGpu == null) missingData.push('No measured benchmark; throughput sizing uses a labeled estimate.');
+  if (state.usageConfidence !== 'measured') missingData.push('Usage is estimated, not measured from telemetry.');
+  if (!state.industry) missingData.push('Industry not set; report language stays generic.');
   return {
     kind: tie ? 'co-recommend' : 'single',
     headline: tie ? `Two viable routes: ${top.label} and ${second.label}.` : `Recommended route: ${top.label}.`,
     top, second: tie ? second : null,
     alternates: routes.slice(tie ? 2 : 1, 4),
     rejected: routes.slice(4),
-    routes, policy, rulesFired,
+    routes, policy, rulesFired, warnings, missingData,
     nextAction: state.usageConfidence !== 'measured'
       ? 'Run a 30 to 60 day telemetry pilot, capture real traces, then re-run TokenOps with measured usage.'
       : 'Validate the leading route with a scoped pilot and hold any hardware quote against the budget ceiling.',
@@ -203,12 +244,13 @@ export function recommend(state, values, rules, ctx, overrides) {
 }
 
 /* Spec section 38: confidence model. */
-export function confidence(state, values) {
+export function confidence(state, values, ratesInUse = []) {
   const map = { measured: 3, high: 3, medium: 2, estimated: 1.5, low: 1, unknown: 1 };
+  const anyUserRates = ratesInUse.some((r) => r.userSupplied);
   const inputs = [
     ['Usage', state.usageConfidence],
     ['Token estimate', state.tokenEstimateConfidence],
-    ['Provider pricing', 'high'],
+    ['Provider pricing', anyUserRates ? 'medium' : 'high'],
     ['Hardware quote', state.gpuQuote != null ? 'high' : 'low'],
     ['Benchmark', state.userBenchmarkTpsPerGpu != null ? 'high' : 'low'],
     ['Policy', state.dataCanLeave ? 'high' : 'low'],
