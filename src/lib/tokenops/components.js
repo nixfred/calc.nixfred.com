@@ -131,6 +131,58 @@ export function inputsRecapCard(state) {
   </div>`;
 }
 
+/* The decision block: unmistakable direction plus finance sliders. */
+export function decisionCard(state, fin, providerMonthlyCost, ceiling) {
+  if (!fin || fin.verdict === 'none') return '';
+  const qMax = Math.max(Math.ceil((ceiling.ceilingCapex || 50000) * 2 / 1000) * 1000, 50000);
+  const banner = `<div class="verdict-banner v-${esc(fin.verdict)}">
+      <span class="v-head mono">${esc(fin.headline)}</span>
+      <span class="v-reason">${esc(fin.reason)}</span>
+    </div>`;
+  const roi = fin.verdict === 'quote' ? '' : `
+    <div class="roi-grid">
+      <div class="roi-cell"><span class="sum-label">tokens per month</span><span class="sum-value mono">${money(providerMonthlyCost)}</span></div>
+      <div class="roi-cell"><span class="sum-label">${fin.financed ? 'loan payment' : 'cash amortized'} per month</span><span class="sum-value mono">${money(fin.payment)}</span></div>
+      <div class="roi-cell"><span class="sum-label">${fin.horizon} month tokens</span><span class="sum-value mono">${money(fin.totalTokens)}</span></div>
+      <div class="roi-cell"><span class="sum-label">${fin.horizon} month hardware</span><span class="sum-value mono">${money(fin.totalHw)}</span></div>
+      <div class="roi-cell"><span class="sum-label">savings over horizon</span><span class="sum-value mono ${fin.savings >= 0 ? 'v-good' : 'v-bad'}">${money(fin.savings)}</span></div>
+      <div class="roi-cell"><span class="sum-label">ROI on hardware spend</span><span class="sum-value mono ${fin.roiPct >= 0 ? 'v-good' : 'v-bad'}">${fmt(fin.roiPct, 0)}%</span></div>
+      <div class="roi-cell"><span class="sum-label">simple payback</span><span class="sum-value mono">${fin.simplePayback ? fin.simplePayback + ' months' : 'n/a'}</span></div>
+    </div>
+    <p class="mono dim" style="font-size:0.75rem">${esc(fin.substitution)} &middot; horizon = max(term, useful life). ROI = savings / hardware spend.</p>`;
+  return `<div class="card" id="decision-card">
+    <h3 class="card-title">The decision</h3>
+    ${banner}
+    ${roi}
+    <div class="finance-sliders">
+      <label class="slider-row">
+        <span class="slider-label">Hardware quote</span>
+        <input type="range" min="0" max="${qMax}" step="1000" value="${state.gpuQuote ?? 0}" data-field="gpuQuote" aria-label="hardware quote dollars">
+        <span class="mono slider-val">${money(state.gpuQuote ?? 0)}</span>
+      </label>
+      <label class="slider-row">
+        <span class="slider-label">How to pay</span>
+        <select data-field="financeMode" style="max-width:12rem">
+          <option value="cash" ${state.financeMode !== 'financed' ? 'selected' : ''}>Cash (amortize over term)</option>
+          <option value="financed" ${state.financeMode === 'financed' ? 'selected' : ''}>Financed (loan payment)</option>
+        </select>
+        <span></span>
+      </label>
+      <label class="slider-row">
+        <span class="slider-label">Term months</span>
+        <input type="range" min="12" max="60" step="6" value="${state.financeTermMonths ?? 36}" data-field="financeTermMonths" aria-label="finance term months">
+        <span class="mono slider-val">${state.financeTermMonths ?? 36}</span>
+      </label>
+      <label class="slider-row">
+        <span class="slider-label">APR percent</span>
+        <input type="range" min="0" max="15" step="0.5" value="${state.financeAprPercent ?? 8}" data-field="financeAprPercent" aria-label="finance APR percent">
+        <span class="mono slider-val">${state.financeAprPercent ?? 8}%</span>
+      </label>
+    </div>
+    <p class="dim">Drag the quote until the verdict flips. That crossing point is the number to negotiate toward. Financing does not change what tokens cost; it changes the monthly bar the hardware must clear.</p>
+  </div>`;
+}
+
 export function optimizationCard(levers) {
   if (!levers?.length) return '';
   return `<div class="card">

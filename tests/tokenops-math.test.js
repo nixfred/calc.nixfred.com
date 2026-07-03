@@ -313,3 +313,33 @@ test('role routed cost prices cached vs uncached correctly (spec 15.1-15.2)', ()
   const expectedPlanner = (36.3 - 14.52) * 10 + 14.52 * 1 + (11000 * 1.1 * 500 / 1e6) * 50;
   expect(planner.cost).toBeCloseTo(expectedPlanner, 6);
 });
+
+/* ---------- finance decision (Fred's ROI sliders, 2026-07-03) ---------- */
+
+test('finance decision: verdicts flip at the right thresholds', async () => {
+  const { financeDecision, hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const s = structuredClone(defaults);
+  const provider = 10000; // $10k/mo tokens
+  const ceiling = hardwareCeiling(s, provider); // $6k/mo bar, $216k capex
+  // No quote: demand one.
+  expect(financeDecision({ ...s, gpuQuote: null }, provider, ceiling).verdict).toBe('quote');
+  // Cash $180k over 36 = $5k/mo <= $6k bar -> BUY.
+  const buy = financeDecision({ ...s, gpuQuote: 180000, financeMode: 'cash' }, provider, ceiling);
+  expect(buy.verdict).toBe('buy');
+  expect(buy.payment).toBeCloseTo(5000, 6);
+  expect(buy.savings).toBeCloseTo(10000 * 36 - 180000, 6); // $180k saved
+  expect(buy.roiPct).toBeCloseTo(100, 6);
+  // Cash $300k over 36 = $8.33k/mo: cheaper than tokens, misses the 40% bar -> NEGOTIATE.
+  expect(financeDecision({ ...s, gpuQuote: 300000, financeMode: 'cash' }, provider, ceiling).verdict).toBe('negotiate');
+  // Cash $450k over 36 = $12.5k/mo > tokens -> TOKENS.
+  expect(financeDecision({ ...s, gpuQuote: 450000, financeMode: 'cash' }, provider, ceiling).verdict).toBe('tokens');
+});
+
+test('finance decision: loan payment matches the standard amortization formula', async () => {
+  const { financeDecision, hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const s = { ...structuredClone(defaults), gpuQuote: 100000, financeMode: 'financed', financeAprPercent: 8, financeTermMonths: 36 };
+  const fin = financeDecision(s, 10000, hardwareCeiling(s, 10000));
+  // 100000 at 8% APR over 36 months: r=0.0066667, payment = 3133.64
+  expect(fin.payment).toBeCloseTo(3133.64, 1);
+  expect(fin.verdict).toBe('buy');
+});

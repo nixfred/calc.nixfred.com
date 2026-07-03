@@ -222,3 +222,22 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
   .hw-grid { grid-template-columns: 1fr; }
   .ceiling-headline { font-size: 1.7rem; }
 }
+
+/* ---------- the decision (verdict + ROI + finance sliders) ---------- */
+.verdict-banner { display: flex; flex-direction: column; gap: 0.35rem; border-radius: 10px; padding: 1rem 1.2rem; margin: 0.6rem 0 1rem; border: 1px solid var(--border); }
+.verdict-banner .v-head { font-size: 1.6rem; font-weight: 750; letter-spacing: 0.03em; }
+.verdict-banner .v-reason { color: var(--muted); font-size: 0.92rem; }
+.v-buy { background: rgba(72, 199, 142, 0.10); border-color: #2e7d5b; }
+.v-buy .v-head { color: #7fd8a4; }
+.v-tokens { background: rgba(77, 163, 255, 0.10); border-color: var(--border-bright); }
+.v-tokens .v-head { color: var(--accent-soft); }
+.v-negotiate { background: rgba(255, 190, 80, 0.09); border-color: #6b5a2e; }
+.v-negotiate .v-head { color: #e8c98a; }
+.v-quote { background: rgba(255, 190, 80, 0.07); border-color: #6b5a2e; }
+.v-quote .v-head { color: #e8c98a; }
+.roi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.7rem; margin: 0.8rem 0; }
+.roi-cell { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; background: var(--surface); }
+.v-good { color: #7fd8a4; }
+.v-bad { color: #f0a3a3; }
+.finance-sliders { margin: 0.8rem 0 0.3rem; }
+.finance-sliders .slider-row { grid-template-columns: 9rem 1fr 8rem; }

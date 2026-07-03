@@ -292,6 +292,53 @@ export function primaryLeverOf(levers) {
   return levers.find((l) => l.savings > 0) ?? null;
 }
 
+/* The decision: tokens vs buying the hardware, with simple finance options.
+   Fred's ask 2026-07-03: make the direction unmistakable, show the ROI math,
+   and let sliders answer HOW to buy (cash or financed, term, APR). */
+export function financeDecision(state, providerMonthlyCost, ceiling) {
+  const quote = state.gpuQuote;
+  const months = Math.max(1, state.financeTermMonths ?? 36);
+  const apr = Math.max(0, state.financeAprPercent ?? 8) / 100;
+  const financed = (state.financeMode ?? 'cash') === 'financed';
+  if (!providerMonthlyCost) return { verdict: 'none' };
+  if (quote == null || quote <= 0) {
+    return {
+      verdict: 'quote',
+      headline: 'GET A QUOTE',
+      reason: `Tokens cost ${money(providerMonthlyCost)} per month. Any hardware quote under ${money(ceiling.ceilingCapex)} all-in beats that by your ${Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40))} percent margin. Bring a number and this becomes a verdict.`,
+    };
+  }
+  // Monthly cost of owning: amortized cash, or standard loan payment.
+  const r = apr / 12;
+  const payment = financed && r > 0
+    ? quote * (r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1)
+    : quote / months;
+  const horizon = Math.max(months, state.usefulLifeMonths ?? 36);
+  const totalHw = financed ? payment * months : quote;
+  const totalTokens = providerMonthlyCost * horizon;
+  const savings = totalTokens - totalHw;
+  const roiPct = totalHw > 0 ? (savings / totalHw) * 100 : 0;
+  const paybackMonths = providerMonthlyCost > payment ? Math.ceil(quote / (providerMonthlyCost - (financed ? 0 : 0)) / 1) : null;
+  const simplePayback = providerMonthlyCost > 0 ? Math.ceil(quote / providerMonthlyCost) : null;
+  const beatsThreshold = payment <= ceiling.ceilingMonthly;
+  const beatsTokens = payment < providerMonthlyCost;
+  const verdict = beatsThreshold ? 'buy' : beatsTokens ? 'negotiate' : 'tokens';
+  return {
+    verdict,
+    headline: verdict === 'buy' ? 'BUY THE HARDWARE' : verdict === 'negotiate' ? 'CLOSE, NEGOTIATE' : 'STAY ON TOKENS',
+    reason: verdict === 'buy'
+      ? `${financed ? 'Financed' : 'Cash-amortized'} at ${money(payment)} per month, ownership beats the ${money(providerMonthlyCost)} token bill by ${fmt((1 - payment / providerMonthlyCost) * 100, 0)} percent, clearing your ${Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40)) } percent bar.`
+      : verdict === 'negotiate'
+        ? `At ${money(payment)} per month this quote is cheaper than tokens (${money(providerMonthlyCost)}) but does not clear your required margin (${money(ceiling.ceilingMonthly)} per month). Negotiate the quote down or accept a thinner cushion knowingly.`
+        : `At ${money(payment)} per month this quote costs MORE than the token route (${money(providerMonthlyCost)}). Tokens win. Re-quote or revisit at higher volume.`,
+    payment, months, apr: apr * 100, financed, quote,
+    totalHw, totalTokens, horizon, savings, roiPct, simplePayback,
+    substitution: financed && r > 0
+      ? `${money(payment)}/mo = ${money(quote)} x (${fmt(r, 4)} x 1.0${''}${''}${''}) loan formula over ${months} months at ${fmt(apr * 100, 1)} percent APR`
+      : `${money(payment)}/mo = ${money(quote)} / ${months} months, cash amortization`,
+  };
+}
+
 export function rentedGpuCost(state, managedCostPerMillion = null) {
   if (state.rentedGpuHourly == null) return null;
   const monthly = state.rentedGpuHourly * state.rentedGpuCount * state.rentedActiveHoursPerMonth
