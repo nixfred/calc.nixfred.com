@@ -89,5 +89,9 @@ const {
         el.addEventListener('mouseenter', () => decode(el, 280));
       });
     </script>
+    <!-- Cloudflare Web Analytics: cookieless page counts only. Never sees
+         entered calculator values (spec 42.3); the audit harness enforces
+         that no other external request exists. -->
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "9996fb7e6e70410893ed26be54810aff"}'></script>
   </body>
 </html>

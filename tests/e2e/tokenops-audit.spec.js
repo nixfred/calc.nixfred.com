@@ -38,12 +38,19 @@ test.describe('Section 46 QA scenario (exact numbers)', () => {
 });
 
 test.describe('Section 45 acceptance criteria (machine checkable)', () => {
-  test('1. loads without external build tools at runtime, all client side', async ({ page }) => {
+  test('1. all client side; ONLY the cookieless analytics beacon may leave the page', async ({ page }) => {
+    // Criterion 40: no customer data transmitted. The CF Web Analytics beacon
+    // (cookieless page counts, settled in the landing interview) is the ONLY
+    // permitted external host; anything else appearing here is a violation.
+    const ALLOWED = ['static.cloudflareinsights.com', 'cloudflareinsights.com'];
     const external = [];
-    page.on('request', (r) => { const u = new URL(r.url()); if (u.hostname !== 'localhost') external.push(r.url()); });
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (u.hostname !== 'localhost' && !ALLOWED.some((h) => u.hostname.endsWith(h))) external.push(r.url());
+    });
     await open(page);
     await page.waitForTimeout(800);
-    expect(external).toEqual([]); // criterion 40: no customer data transmitted, no external calls at all
+    expect(external).toEqual([]);
   });
 
   test('2-9. legacy workload formulas present, editable, and correct', async ({ page }) => {

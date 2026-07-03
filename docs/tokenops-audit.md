@@ -58,7 +58,7 @@ not machine-checkable), PENDING.
 37. PASS Markdown export works (customer summary + detailed math; buttons asserted in e2e, generators unit-importable).
 38. PASS Print report works (print overlay with formula appendix, sources, not-a-quote footer; decision 0.6.26 footer fields included).
 39. PASS JSON export works (scenario save/load/import).
-40. PASS No customer data transmitted externally by default (e2e network assertion; no analytics beacon on tokenops in this release).
+40. PASS No customer data transmitted externally (e2e network assertion). The one permitted external request is the cookieless Cloudflare Web Analytics beacon (page counts only, never entered values; added 2026-07-03 with Fred's token); the harness allowlists exactly that host and fails on any other.
 
 ## Section 0 settled decisions (1-32)
 
