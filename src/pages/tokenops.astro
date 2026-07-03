@@ -1,0 +1,29 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/tokenops.css';
+---
+<Base
+  title="TokenOps - calc.nixfred.com"
+  description="AI workload placement and token economics calculator. Transparent math: every number shows its formula, variables, live substitution, assumptions, and sources. Never a quote."
+>
+  <div class="tokenops-summary hidden" id="tokenops-summary" aria-live="polite"></div>
+  <main class="tokenops-main">
+    <div id="tokenops-root">
+      <noscript><p>TokenOps calculates entirely in your browser and needs JavaScript. Nothing you enter leaves this page.</p></noscript>
+    </div>
+  </main>
+
+  <script>
+    import { createApp } from '../lib/tokenops/app.js';
+    import defaults from '../data/tokenops/tokenops-defaults.json';
+    import rates from '../data/tokenops/provider-rates.json';
+    import hardware from '../data/tokenops/hardware-profiles.json';
+    import sources from '../data/tokenops/sources.json';
+    import rules from '../data/tokenops/route-rules.json';
+    import providerMeta from '../data/tokenops/providers.json';
+
+    const root = document.getElementById('tokenops-root');
+    // Exposed for the Playwright audit harness (read-only debugging handle).
+    (window as any).__tokenops = createApp(root, { defaults, rates, hardware, sources, rules, providerMeta });
+  </script>
+</Base>
