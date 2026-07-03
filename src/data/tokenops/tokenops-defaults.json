@@ -7,7 +7,6 @@
   "budgetConfidence": "medium",
   "mainDriver": "",
   "mainRisk": "",
-
   "dataCanLeave": "yes",
   "promptsCanLeave": "yes",
   "docsCanLeave": "yes",
@@ -23,14 +22,12 @@
   "requiresOnPrem": false,
   "permitsPrivateCloud": true,
   "permitsPublicCloud": true,
-
   "wlRag": false,
   "wlAgents": false,
   "wlCoding": false,
   "wlAgenticCoding": false,
   "wlModernAgent": true,
   "customWorkloadMonthlyTokens": 0,
-
   "concurrentConnections": 20,
   "ragDays": 22,
   "ragHours": 8,
@@ -47,7 +44,6 @@
   "acDays": 22,
   "acHours": 6,
   "agenticCodingTokensPerDevHour": 104167,
-
   "users": 200,
   "concurrentUsers": 40,
   "runsPerUserPerDay": 5,
@@ -58,7 +54,6 @@
   "adoptionPercent": 50,
   "growthPercent": 0,
   "seasonalityMultiplier": 1,
-
   "topologyType": "planner-worker-judge",
   "plannerCalls": 1,
   "routerCalls": 0,
@@ -77,18 +72,52 @@
   "escalationPercent": 0,
   "maxLoopDepth": 3,
   "parallelBranchCount": 1,
-
   "roles": {
-    "planner": { "inputTokensPerCall": 3000, "outputTokensPerCall": 500, "reasoningTokensPerCall": 0, "provider": "anthropic", "tier": "flagship" },
-    "worker": { "inputTokensPerCall": 8000, "outputTokensPerCall": 1200, "reasoningTokensPerCall": 0, "provider": "anthropic", "tier": "workhorse" },
-    "judge": { "inputTokensPerCall": 5000, "outputTokensPerCall": 500, "reasoningTokensPerCall": 0, "provider": "anthropic", "tier": "workhorse" },
-    "summarizer": { "inputTokensPerCall": 2000, "outputTokensPerCall": 300, "reasoningTokensPerCall": 0, "provider": "anthropic", "tier": "mini" },
-    "router": { "inputTokensPerCall": 800, "outputTokensPerCall": 50, "reasoningTokensPerCall": 0, "provider": "anthropic", "tier": "mini" },
-    "critic": { "inputTokensPerCall": 4000, "outputTokensPerCall": 400, "reasoningTokensPerCall": 0, "provider": "anthropic", "tier": "workhorse" }
+    "planner": {
+      "inputTokensPerCall": 3000,
+      "outputTokensPerCall": 500,
+      "reasoningTokensPerCall": 0,
+      "provider": "anthropic",
+      "tier": "flagship"
+    },
+    "worker": {
+      "inputTokensPerCall": 8000,
+      "outputTokensPerCall": 1200,
+      "reasoningTokensPerCall": 0,
+      "provider": "anthropic",
+      "tier": "workhorse"
+    },
+    "judge": {
+      "inputTokensPerCall": 5000,
+      "outputTokensPerCall": 500,
+      "reasoningTokensPerCall": 0,
+      "provider": "anthropic",
+      "tier": "workhorse"
+    },
+    "summarizer": {
+      "inputTokensPerCall": 2000,
+      "outputTokensPerCall": 300,
+      "reasoningTokensPerCall": 0,
+      "provider": "anthropic",
+      "tier": "mini"
+    },
+    "router": {
+      "inputTokensPerCall": 800,
+      "outputTokensPerCall": 50,
+      "reasoningTokensPerCall": 0,
+      "provider": "anthropic",
+      "tier": "mini"
+    },
+    "critic": {
+      "inputTokensPerCall": 4000,
+      "outputTokensPerCall": 400,
+      "reasoningTokensPerCall": 0,
+      "provider": "anthropic",
+      "tier": "workhorse"
+    }
   },
   "cachedInputPercent": 40,
   "batchEligiblePercent": 0,
-
   "carryEnabled": false,
   "carryForwardPercent": 30,
   "priorStepInputTokens": 2000,
@@ -96,7 +125,6 @@
   "carriedSteps": 2,
   "summarizeCarry": false,
   "summaryCompressionRatio": 0.2,
-
   "ragEnabled": false,
   "vectorStoreProvider": "pgvector",
   "documentsIndexed": 10000,
@@ -112,7 +140,6 @@
   "dailyNewDocuments": 50,
   "dailyChangedDocuments": 20,
   "queryRewriteCalls": 0,
-
   "toolUseEnabled": false,
   "toolsExposed": 8,
   "avgToolSchemaTokens": 350,
@@ -122,7 +149,6 @@
   "toolResultSummarization": false,
   "toolResultSummaryTokens": 150,
   "failedToolRatePercent": 5,
-
   "memoryEnabled": false,
   "memRetrievalsPerRun": 1,
   "memChunksRetrieved": 3,
@@ -132,7 +158,6 @@
   "traceRetained": true,
   "traceRetentionDays": 90,
   "avgBytesPerTokenInTrace": 6,
-
   "modelSizeQuickPick": "70",
   "modelParamsB": 70,
   "quantization": "fp8",
@@ -152,7 +177,6 @@
   "kvBytesPerElement": 1,
   "concurrentSequences": 32,
   "kvQuantizationFactor": 1,
-
   "modelRepoTB": 1,
   "storageGrowthPercent": 20,
   "replicationFactor": 2,
@@ -160,12 +184,10 @@
   "indexOverheadFactor": 1.2,
   "bytesPerVectorRecord": 7987,
   "retentionMonths": 3,
-
   "avgBytesPerToken": 4,
   "avgRetrievedBytesPerQuery": 200000,
   "avgToolPayloadBytes": 50000,
   "networkOverheadMbps": 50,
-
   "savingsThresholdPercent": 40,
   "usefulLifeMonths": 36,
   "gpuQuote": null,
@@ -177,7 +199,6 @@
   "rentedNetworkMonthly": 100,
   "rentedPlatformMonthly": 0,
   "rentedValidationHours": 100,
-
   "needGovernance": 2,
   "needAgentBuilder": 1,
   "needIntegration": 2,
@@ -201,12 +222,11 @@
   "hpePreference": 0,
   "nvidiaPreference": 1,
   "amdPreference": 0,
-
   "usageConfidence": "estimated",
   "tokenEstimateConfidence": "estimated",
   "modelQualityConfidence": "medium",
   "opsReadinessConfidence": "medium",
-
   "mode": null,
-  "usageVolumeKnown": true
+  "usageVolumeKnown": true,
+  "quickInputSharePercent": 70
 }

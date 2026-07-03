@@ -268,6 +268,30 @@ test('unpriced role is surfaced, and billedTokens excludes its tokens (no silent
   expect(partial.total).toBeLessThan(all.total);
 });
 
+test('FRED BUG 2026-07-03: quick workloads are PRICED, demand can never show $0 (422M token case)', () => {
+  // Reproduces the live report: RAG quick workload on, zero agent runs.
+  const s = { ...structuredClone(defaults), wlRag: true, users: 0 };
+  const { values } = engine.evaluate(s, {});
+  expect(values.ragMonthlyTokens).toBe(422400000); // 2000 * 20 * 22 * 8 * 60
+  const { total, billedTokens, perRole } = roleRoutedCost(s, values, rates);
+  expect(total).toBeGreaterThan(0);                       // dollars exist now
+  expect(billedTokens).toBeGreaterThanOrEqual(422400000); // and they cover the demand
+  const quick = perRole.find((r) => r.role === 'quick workloads');
+  expect(quick.cost).toBeGreaterThan(0);
+  // Hand check at 70/30 split, Anthropic workhorse (2 / 0.2 / 10), 40% cache:
+  // in 295.68M -> 0.6*295.68*2 + 0.4*295.68*0.2 = 354.816 + 23.6544
+  // out 126.72M -> 126.72 * 10 = 1267.2   => total 1645.67
+  expect(quick.cost).toBeCloseTo(1645.67, 1);
+});
+
+test('quick workload pricing respects the editable input/output split', () => {
+  const s = { ...structuredClone(defaults), wlRag: true, users: 0 };
+  const { values } = engine.evaluate(s, {});
+  const at70 = roleRoutedCost({ ...s, quickInputSharePercent: 70 }, values, rates).total;
+  const at100 = roleRoutedCost({ ...s, quickInputSharePercent: 100 }, values, rates).total;
+  expect(at100).toBeLessThan(at70); // all-input is cheaper than 30% output at 5x pricing
+});
+
 test('do-not-size usage gate accepts non-agent workloads (coding-only is known usage)', () => {
   const s = { ...structuredClone(defaults), wlModernAgent: false, wlCoding: true, developers: 25, users: 0 };
   expect(checkDoNotSize(s).length).toBe(0);
