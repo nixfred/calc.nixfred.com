@@ -272,6 +272,18 @@ test.describe('Section 0 settled decisions', () => {
     expect(errs).toContain('activeHoursPerDay');
   });
 
+  test('landing page: feedback form present with honeypot (Phase 7)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#feedback-form')).toBeVisible();
+    await expect(page.locator('#fb-message')).toBeVisible();
+    // Honeypot exists but is invisible to humans.
+    await expect(page.locator('#fb-website')).toHaveCount(1);
+    await expect(page.locator('#fb-website')).not.toBeInViewport();
+    // Empty submit is rejected client-side, no network needed.
+    await page.locator('.fb-send').click();
+    await expect(page.locator('#fb-status')).toContainText('Pick yes or no');
+  });
+
   test('landing page: TokenOps LIVE and the ENTIRE card is clickable (Fred standard 2026-07-03)', async ({ page }) => {
     await page.goto('/');
     const link = page.locator('.calc-card.live a.card-link');

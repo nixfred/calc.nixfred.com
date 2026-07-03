@@ -1,0 +1,69 @@
+name: Stale source check
+
+# TokenOps warns users when pricing sources pass 60 days without review
+# (settled decision 0.3.11). This robot warns FRED at 50 days, before the
+# staleness ever reaches the live site. Runs monthly plus on demand.
+
+on:
+  schedule:
+    - cron: '0 13 1 * *'   # 09:00 America/New_York on the 1st, give or take DST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check lastReviewed dates
+        id: scan
+        run: |
+          node -e '
+            const fs = require("fs");
+            const WARN_DAYS = 50;
+            const now = Date.now();
+            const stale = [];
+            const scan = (file, rows, labelOf) => {
+              for (const r of rows) {
+                if (!r.lastReviewed) continue;
+                const age = Math.floor((now - new Date(r.lastReviewed).getTime()) / 86400000);
+                if (age >= WARN_DAYS) stale.push(`${labelOf(r)} (${file}): ${age} days since review`);
+              }
+            };
+            scan("provider-rates.json", JSON.parse(fs.readFileSync("src/data/tokenops/provider-rates.json")), r => `${r.providerKey} ${r.model}`);
+            scan("sources.json", JSON.parse(fs.readFileSync("src/data/tokenops/sources.json")), r => r.label);
+            scan("hardware-profiles.json", JSON.parse(fs.readFileSync("src/data/tokenops/hardware-profiles.json")), r => `${r.vendor} ${r.name}`);
+            fs.writeFileSync("stale.txt", stale.join("\n"));
+            console.log(stale.length ? stale.join("\n") : "all fresh");
+          '
+          echo "count=$(grep -c . stale.txt || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the staleness issue
+        if: steps.scan.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="TokenOps sources approaching the 60-day staleness cliff"
+          BODY="These entries pass 50 days since lastReviewed. At 60 days the LIVE SITE starts showing STALE warnings to users. Re-verify against the linked pricing/vendor pages and bump lastReviewed.
+
+          $(cat stale.txt)
+
+          Re-verify, update the JSON, and this issue closes on the next clean run."
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label "stale-sources" || gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+      - name: Close the issue when everything is fresh
+        if: steps.scan.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --state open --search "staleness cliff in:title" --json number -q '.[0].number')
+          [ -n "$EXISTING" ] && gh issue close "$EXISTING" --comment "All sources re-verified and fresh. Closing." || echo "nothing to close"

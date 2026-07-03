@@ -1,0 +1,16 @@
+name = "calc-feedback"
+main = "index.js"
+compatibility_date = "2026-07-01"
+
+routes = [
+  { pattern = "calc.nixfred.com/api/feedback*", zone_name = "nixfred.com" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "calc-feedback"
+database_id = "7e918bda-4cb3-4fad-bd18-64fa88c5349e"
+
+# Optional: set TURNSTILE_SECRET via `wrangler secret put TURNSTILE_SECRET`
+# once a Turnstile widget exists; the worker verifies tokens automatically
+# when the secret is present. Honeypot + rate limit protect v1 meanwhile.
