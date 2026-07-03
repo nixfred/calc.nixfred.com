@@ -13,25 +13,17 @@ import * as X from './exports.js';
 export const VERSION = 'v1.0.0';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const GLYPHS = '#$%&@!?*+=<>[]{}/\\|~^;:';
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/* Staggered build-in on view changes. Fred's call 2026-07-03: no glyph
+   scrambling inside the calculator (too much); the decode effect stays the
+   LANDING page signature. Dynamic build feel, quiet execution. */
 function decodeIn(rootEl) {
   if (reduced()) return;
-  rootEl.querySelectorAll('[data-decode-app]').forEach((el, i) => {
-    const original = el.textContent;
-    el.textContent = original.replace(/\S/g, () => GLYPHS[Math.floor(Math.random() * GLYPHS.length)]);
-    const start = performance.now() + 40 + i * 60;
-    const dur = 380;
-    function frame(now) {
-      const t = Math.max(0, Math.min((now - start) / dur, 1));
-      const settled = Math.floor(t * original.length);
-      let out = original.slice(0, settled);
-      for (let j = settled; j < original.length; j++) out += original[j] === ' ' ? ' ' : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-      el.textContent = out;
-      if (t < 1) requestAnimationFrame(frame); else el.textContent = original;
-    }
-    requestAnimationFrame(frame);
+  const blocks = rootEl.querySelectorAll('.a-section, .card, .chooser > *, .wizard > *, #results > *');
+  blocks.forEach((el, i) => {
+    el.classList.add('rise');
+    el.style.animationDelay = `${Math.min(i * 45, 500)}ms`;
   });
 }
 
@@ -225,11 +217,11 @@ export function createApp(root, data) {
   function renderChooser() {
     root.innerHTML = `
       <div class="chooser">
-        <h1 data-decode-app>TokenOps</h1>
+        <h1>TokenOps</h1>
         <p class="dim">AI workload placement and token economics. Real math on screen, always.</p>
         <div class="chooser-btns">
-          <button class="choose" data-goto="meeting"><span class="choose-title" data-decode-app>In a meeting</span><span class="dim">About 12 inputs. Two minutes to a defensible answer.</span></button>
-          <button class="choose" data-goto="architect"><span class="choose-title" data-decode-app>Deep sizing</span><span class="dim">Every section, every formula, every assumption.</span></button>
+          <button class="choose" data-goto="meeting"><span class="choose-title">In a meeting</span><span class="dim">About 12 inputs. Two minutes to a defensible answer.</span></button>
+          <button class="choose" data-goto="architect"><span class="choose-title">Deep sizing</span><span class="dim">Every section, every formula, every assumption.</span></button>
         </div>
         <p class="preset-row">Start from a preset:
           <select id="preset-select"><option value="">choose...</option>${Object.entries(WORKLOAD_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('')}</select>
@@ -246,12 +238,12 @@ export function createApp(root, data) {
       <div class="wizard">
         <div class="wiz-nav mono">${MEETING_STEPS.map((s, i) => `<span class="wiz-dot ${i === meetingStep ? 'cur' : i < meetingStep ? 'done' : ''}">${i + 1}</span>`).join('')}<span class="wiz-dot ${last ? 'cur' : ''}">=</span></div>
         ${last ? `
-          <h2 data-decode-app>The answer</h2>
+          <h2>The answer</h2>
           ${errorsHtml(cx.errors)}
           <div id="results">${resultsStack(cx, true)}</div>
           <div class="btn-row"><button data-wiz="back">back</button></div>
         ` : `
-          <h2 data-decode-app>${esc(step.title)}</h2>
+          <h2>${esc(step.title)}</h2>
           <div class="wiz-fields">${step.fields.map(fieldHtml).join('')}</div>
           <div class="btn-row">
             ${meetingStep > 0 ? '<button data-wiz="back">back</button>' : '<button data-goto="chooser">start over</button>'}
@@ -267,7 +259,7 @@ export function createApp(root, data) {
     const secs = SECTIONS.map((sec) => {
       if (sec.when && !sec.when(state)) return '';
       return `<section class="a-section" id="sec-${sec.id}">
-        <h2 class="a-title" data-decode-app>${esc(sec.title)}</h2>
+        <h2 class="a-title">${esc(sec.title)}</h2>
         <p class="dim">${esc(sec.blurb)}</p>
         <div class="a-fields">${sec.fields.map(fieldHtml).join('')}</div>
         <div class="a-traces" data-traces-for="${sec.id}">${sectionTraces(sec.id, cx)}</div>
@@ -283,7 +275,7 @@ export function createApp(root, data) {
           </div>
           ${errorsHtml(cx.errors)}
           ${secs}
-          <section id="results"><h2 class="a-title" data-decode-app>Results</h2>${resultsStack(cx, false)}</section>
+          <section id="results"><h2 class="a-title">Results</h2>${resultsStack(cx, false)}</section>
         </div>
       </div>`;
     decodeIn(root);
