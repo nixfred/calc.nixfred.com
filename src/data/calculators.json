@@ -10,8 +10,18 @@
     "tags": ["AI", "TOKENS", "PLACEMENT"]
   },
   {
-    "slug": "poc-readiness",
+    "slug": "nutanix-sizer",
     "index": "02",
+    "title": "Nutanix Conversation Sizer",
+    "status": "live",
+    "oneLiner": "Rough node ranges from the public field guide. CVM tax paid. Not a quote, not formal sizing.",
+    "inputs": 15,
+    "outputs": 4,
+    "tags": ["NUTANIX", "SIZING"]
+  },
+  {
+    "slug": "poc-readiness",
+    "index": "03",
     "title": "Should We Run a POC",
     "status": "queued",
     "oneLiner": "Scores whether a deal is ready for a POC, more discovery, or a lighter evaluation.",
@@ -21,22 +31,12 @@
   },
   {
     "slug": "vmware-renewal-triage",
-    "index": "03",
+    "index": "04",
     "title": "VMware Renewal Triage",
     "status": "queued",
     "oneLiner": "Turns a renewal quote into timing, leverage, and modernization options.",
     "inputs": 10,
     "outputs": 6,
     "tags": ["VMWARE", "RENEWAL"]
-  },
-  {
-    "slug": "nutanix-conversation-sizer",
-    "index": "04",
-    "title": "Nutanix Conversation Sizer",
-    "status": "queued",
-    "oneLiner": "Rough resource ranges for a conversation. Not a quote, not formal sizing.",
-    "inputs": 10,
-    "outputs": 5,
-    "tags": ["NUTANIX", "SIZING"]
   }
 ]
