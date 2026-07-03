@@ -109,7 +109,10 @@ A calculator that produces only a number is not done.
    rendered visibly on the result.
 5. Result section produces all four outputs (answer, whiteboard card,
    script, next action) plus a copy button and a print view.
-6. Flip status to `live` in calculators.json only when Fred approves.
+6. STANDING ORDER (Fred, 2026-07-03): do NOT ask before pushing live.
+   When the harness is green, flip status to `live` and deploy to
+   production immediately, every time. The tests are the gate, not a
+   conversation. Fred reviews the live site and orders changes after.
 7. Document the methodology in `docs/<slug>.md` (public receipts).
 8. One calculator at a time. Never batch.
 

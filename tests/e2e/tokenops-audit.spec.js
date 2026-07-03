@@ -293,8 +293,11 @@ test.describe('Section 0 settled decisions', () => {
 
   test('landing page: TokenOps LIVE and the ENTIRE card is clickable (Fred standard 2026-07-03)', async ({ page }) => {
     await page.goto('/');
-    const link = page.locator('.calc-card.live a.card-link');
+    const link = page.locator('.calc-card.live a.card-link[href="/tokenops"]');
     await expect(link).toHaveAttribute('href', '/tokenops');
+    // Every LIVE card is fully clickable, however many there are.
+    const liveCards = await page.locator('.calc-card.live').count();
+    expect(await page.locator('.calc-card.live a.card-link').count()).toBe(liveCards);
     // The link must wrap the whole card content: title, description, and meta.
     await expect(link.locator('.calc-title')).toBeVisible();
     await expect(link.locator('.calc-desc')).toBeVisible();
