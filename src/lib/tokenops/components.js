@@ -139,7 +139,7 @@ export function providerTable(cmp, providerMeta, sources) {
   }).join('');
   return `<div class="card">
     <h3 class="card-title">Provider comparison</h3>
-    <p class="dim">The AGENT workload priced inside each provider family, role tiering kept. Quick-formula workloads appear in demand totals but are not priced here. Public list prices, editable in the rates panel. Never a quote.</p>
+    <p class="dim">The whole workload priced inside each provider family: agent roles at their tiers, quick-formula workloads at the worker rate with an editable input/output split. Public list prices, editable in the rates panel. Never a quote.</p>
     <div class="table-wrap"><table class="cmp-table">
       <thead><tr><th>provider</th><th>monthly</th><th>per run</th><th>per user</th><th>source</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -242,7 +242,7 @@ export function whiteboardCard(data) {
     <h3 class="card-title">Whiteboard card</h3>
     <div class="wb-inner">
       <p class="wb-line"><span class="k">workload</span> ${esc(data.scenario)}</p>
-      <p class="wb-line"><span class="k">volume</span> <span class="mono">${fmt(data.monthlyRuns)}</span> runs/mo &middot; <span class="mono">${fmt(data.monthlyTokens)}</span> tokens/mo</p>
+      <p class="wb-line"><span class="k">volume</span> ${data.monthlyRuns ? `<span class="mono">${fmt(data.monthlyRuns)}</span> runs/mo &middot; ` : ''}<span class="mono">${fmt(data.monthlyTokens)}</span> tokens/mo</p>
       <p class="wb-line"><span class="k">best route</span> ${esc(data.route)}</p>
       <p class="wb-line"><span class="k">why</span></p>
       <ol>${data.why.map((w) => `<li>${esc(w)}</li>`).join('')}</ol>

@@ -56,6 +56,7 @@ export const SECTIONS = [
       tog('wlCoding', 'Coding assistant (quick formula)'),
       tog('wlAgenticCoding', 'Agentic coding (quick formula)'),
       num('customWorkloadMonthlyTokens', 'Custom workload tokens per month', { min: 0, step: 1000000 }),
+      num('quickInputSharePercent', 'Quick workload input share percent', { min: 0, max: 100, hint: 'Quick-formula tokens are priced at the worker rate using this input/output split.', show: (s) => s.wlRag || s.wlAgents || s.wlCoding || s.wlAgenticCoding || (s.customWorkloadMonthlyTokens ?? 0) > 0 }),
       num('concurrentConnections', 'RAG concurrent connections', { show: (s) => s.wlRag }),
       num('ragDays', 'RAG days per month', { min: 1, max: 31, show: (s) => s.wlRag }),
       num('ragHours', 'RAG hours per day', { min: 1, max: 24, show: (s) => s.wlRag }),

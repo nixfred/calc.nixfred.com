@@ -52,6 +52,45 @@ export function roleRoutedCost(state, values, rates) {
     });
     total += cost;
   }
+  // Quick-formula workloads (RAG, agents, coding, agentic coding, custom)
+  // are REAL token demand and get priced too, at the worker role's rate,
+  // with a visible editable input/output split. Fred found the gap live:
+  // 422M tokens of demand showing $0. Never again.
+  const quickTokens = (values.ragMonthlyTokens ?? 0) + (values.agentsMonthlyTokens ?? 0)
+    + (values.codingMonthlyTokens ?? 0) + (values.agenticCodingMonthlyTokens ?? 0)
+    + (state.customWorkloadMonthlyTokens ?? 0);
+  let quickBilled = 0;
+  if (quickTokens > 0) {
+    const cfg = state.roles.worker ?? Object.values(state.roles)[0];
+    const rate = findRate(rates, cfg.provider, cfg.tier);
+    if (!rate || rate.inputPerMillion == null) {
+      perRole.push({ role: 'quick workloads', calls: null, missing: true, provider: cfg.provider, tier: cfg.tier });
+    } else {
+      const inShare = Math.min(100, Math.max(0, state.quickInputSharePercent ?? 70)) / 100;
+      const inTokM = (quickTokens * inShare) / 1e6;
+      const outTokM = (quickTokens * (1 - inShare)) / 1e6;
+      const cachedM = inTokM * cachedShare;
+      const uncachedM = inTokM - cachedM;
+      const cachedPrice = rate.cachedInputPerMillion ?? rate.inputPerMillion;
+      let cost = uncachedM * rate.inputPerMillion + cachedM * cachedPrice + outTokM * rate.outputPerMillion;
+      let batchSavings = 0;
+      if (batchShare > 0 && rate.batchDiscountMultiplier != null) {
+        batchSavings = cost * batchShare * (1 - rate.batchDiscountMultiplier);
+        cost -= batchSavings;
+      }
+      const uplift = (rate.regionalUpliftPercent ?? 0) / 100;
+      if (uplift) cost *= 1 + uplift;
+      perRole.push({
+        role: 'quick workloads', calls: null, provider: cfg.provider, tier: cfg.tier, model: rate.model,
+        inputMTok: inTokM, cachedMTok: cachedM, uncachedMTok: uncachedM, outputMTok: outTokM,
+        inputPrice: rate.inputPerMillion, cachedPrice, outputPrice: rate.outputPerMillion,
+        cost, batchSavings, sourceId: rate.sourceId, lastReviewed: rate.lastReviewed, userSupplied: !!rate.userSupplied,
+        substitution: `${money(cost)} = (${fmt(uncachedM)} MTok * ${money(rate.inputPerMillion, 2)}) + (${fmt(cachedM)} MTok * ${money(cachedPrice, 2)}) + (${fmt(outTokM)} MTok * ${money(rate.outputPerMillion, 2)}) at ${Math.round(inShare * 100)}/${Math.round((1 - inShare) * 100)} input/output split, editable`,
+      });
+      total += cost;
+      quickBilled = quickTokens;
+    }
+  }
   // Embedding fees (spec 15.1). User-supplied price; warned when RAG is on without one.
   let embeddingFee = 0;
   if (state.ragEnabled && state.embeddingPricePerMillion != null && values.monthlyEmbeddingTokens) {
@@ -63,7 +102,7 @@ export function roleRoutedCost(state, values, rates) {
   // averaged into a diluted rate (audit finding).
   const missingRoles = perRole.filter((r) => r.missing).map((r) => `${r.role} (${r.provider}/${r.tier})`);
   const pricedRoles = new Set(perRole.filter((r) => !r.missing).map((r) => r.role));
-  const billedTokens = runs * plan.filter((p) => pricedRoles.has(p.role)).reduce((a, p) => a + p.inPerRun + p.outPerRun, 0);
+  const billedTokens = runs * plan.filter((p) => pricedRoles.has(p.role)).reduce((a, p) => a + p.inPerRun + p.outPerRun, 0) + quickBilled;
   return { total, perRole, embeddingFee, billedTokens, missingRoles };
 }
 
