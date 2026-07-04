@@ -11,6 +11,7 @@ node_modules/
 
 # Screenshots and playwright artifacts
 *.png
+!public/share/*.png
 .playwright-mcp/
 
 # TokenOps spec + BlueAlly foundation material, never public

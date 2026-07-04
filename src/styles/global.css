@@ -94,6 +94,17 @@ a:hover { color: var(--accent-soft); text-decoration: underline; }
 .site-nav a { color: var(--muted); }
 .site-nav a:hover { color: var(--accent-soft); text-decoration: none; }
 
+.share-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.share-btn:hover { color: var(--accent-soft); }
+
 /* ---------- hero ---------- */
 
 .hero {

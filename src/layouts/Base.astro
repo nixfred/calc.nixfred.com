@@ -10,6 +10,10 @@ const {
   title = 'calc.nixfred.com',
   description = 'Field calculators for IT infrastructure conversations. Rough math, honest assumptions, and a next action you can say out loud.',
 } = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site).toString();
+const shareImageUrl = new URL('/share/card.png', Astro.site).toString();
+const shareImageAlt = 'calc.nixfred.com. Math you can whiteboard. Field calculators for IT infrastructure conversations.';
 ---
 <!doctype html>
 <html lang="en">
@@ -19,9 +23,20 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonicalUrl} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:site_name" content="calc.nixfred.com" />
+    <meta property="og:image" content={shareImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={shareImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={shareImageUrl} />
   </head>
   <body>
     <header class="site-header">
@@ -30,6 +45,7 @@ const {
         <nav class="site-nav">
           <a href="https://nixfred.com">nixfred.com</a>
           <a href="https://github.com/nixfred/calc.nixfred.com">source</a>
+          <button type="button" class="share-btn" data-share-btn>share</button>
         </nav>
       </div>
     </header>
@@ -87,6 +103,31 @@ const {
 
       document.querySelectorAll<HTMLElement>('[data-scramble-hover]').forEach((el) => {
         el.addEventListener('mouseenter', () => decode(el, 280));
+      });
+
+      // Share button: native share sheet where available, clipboard copy
+      // otherwise. location.href carries whatever hash or query state the
+      // page is in, so a shared link reproduces the current view.
+      const shareBtn = document.querySelector<HTMLButtonElement>('[data-share-btn]');
+      shareBtn?.addEventListener('click', async () => {
+        const description = document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '';
+        const url = location.href;
+        if (navigator.share) {
+          try {
+            await navigator.share({ title: document.title, text: description, url });
+          } catch (err) {
+            if ((err as Error).name !== 'AbortError') console.error('share failed', err);
+          }
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(url);
+          const original = shareBtn.textContent;
+          shareBtn.textContent = 'copied';
+          setTimeout(() => { shareBtn.textContent = original; }, 1500);
+        } catch (err) {
+          console.error('clipboard copy failed', err);
+        }
       });
     </script>
     <!-- Cloudflare Web Analytics: cookieless page counts only. Never sees
