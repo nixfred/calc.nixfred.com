@@ -225,8 +225,15 @@ test.describe('Section 0 settled decisions', () => {
   test('0.4 ceiling: never a hardware price, quote slot verdict works', async ({ page }) => {
     await open(page);
     await expect(page.locator('.ceiling-headline')).toBeVisible();
+    // An absurd $1 quote is rejected as implausible, not celebrated (Fred UX catch).
+    const absurd = await page.evaluate(() => {
+      window.__tokenops.getState().gpuQuote = 1;
+      return window.__tokenops.compute().ceiling.verdict.implausible;
+    });
+    expect(absurd).toBe(true);
     const verdict = await page.evaluate(() => {
-      window.__tokenops.getState().gpuQuote = 1; // absurdly cheap quote
+      const half = Math.round(window.__tokenops.compute().ceiling.ceilingCapex * 0.5);
+      window.__tokenops.getState().gpuQuote = half; // realistic, comfortably under
       return window.__tokenops.compute().ceiling.verdict.under;
     });
     expect(verdict).toBe(true);
