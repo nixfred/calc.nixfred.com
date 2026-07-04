@@ -293,19 +293,19 @@ export function createApp(root, data) {
     const cx = compute();
     const last = meetingStep >= MEETING_STEPS.length;
     const step = last ? null : MEETING_STEPS[meetingStep];
-    root.innerHTML = `
+    root.innerHTML = `${C.appNav(view === 'meeting' && meetingStep >= MEETING_STEPS.length ? 'meeting-answer' : 'meeting', !!landingMeta)}
       <div class="wizard">
         <div class="wiz-nav mono">${MEETING_STEPS.map((s, i) => `<span class="wiz-dot ${i === meetingStep ? 'cur' : i < meetingStep ? 'done' : ''}">${i + 1}</span>`).join('')}<span class="wiz-dot ${last ? 'cur' : ''}">=</span></div>
         ${last ? `
           <h2>The answer</h2>
           ${errorsHtml(cx.errors)}
           <div id="results">${resultsStack(cx, true)}</div>
-          <div class="btn-row"><button data-wiz="back">back</button></div>
+          <div class="btn-row">${landingMeta ? '<button data-goto="landing">back to your starting point</button>' : '<button data-wiz="back">back</button>'}</div>
         ` : `
           <h2>${esc(step.title)}</h2>
           <div class="wiz-fields">${step.fields.map(fieldHtml).join('')}</div>
           <div class="btn-row">
-            ${meetingStep > 0 ? '<button data-wiz="back">back</button>' : '<button data-goto="chooser">start over</button>'}
+            ${meetingStep > 0 ? '<button data-wiz="back">back</button>' : '<button data-goto="start">back to start</button>'}
             <button class="primary" data-wiz="next">${meetingStep === MEETING_STEPS.length - 1 ? 'show the answer' : 'next'}</button>
           </div>
         `}
@@ -324,11 +324,11 @@ export function createApp(root, data) {
         <div class="a-traces" data-traces-for="${sec.id}">${sectionTraces(sec.id, cx)}</div>
       </section>`;
     }).join('');
-    root.innerHTML = `
+    root.innerHTML = `${C.appNav('architect', !!landingMeta)}
       <div class="architect">
         <nav class="a-nav mono" aria-label="Sections">${SECTIONS.filter((s) => !s.when || s.when(state)).map((s) => `<a href="#sec-${s.id}">${esc(s.title)}</a>`).join('')}<a href="#results">Results</a></nav>
         <div class="a-body">
-          <div class="btn-row"><button data-goto="chooser">mode chooser</button>
+          <div class="btn-row"><button data-goto="start">start</button>${landingMeta ? '<button data-goto="landing">your starting point</button>' : ''}
             <select id="preset-select"><option value="">apply preset...</option>${Object.entries(WORKLOAD_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('')}</select>
             <button id="reset-all">reset to defaults</button>
           </div>
@@ -341,9 +341,11 @@ export function createApp(root, data) {
   }
 
   function render() {
-    if (view === 'start') { root.innerHTML = C.startScreen(PRESETS_REG, EXAMPLE_CUSTOMERS, startSel); decodeIn(root); updateSummaryBar(); return; }
-    if (view === 'landing' && landingMeta) { root.innerHTML = C.landingPanel(landingMeta, PRESETS_REG); decodeIn(root); updateSummaryBar(); return; }
-    if (view === 'chooser') renderChooser();
+    if (view === 'chooser') view = 'start'; // legacy chooser retired: it had no way back (Fred: trapped)
+    if (view === 'landing' && !landingMeta) view = 'start';
+    const nav = C.appNav(view, !!landingMeta);
+    if (view === 'start') { root.innerHTML = nav + C.startScreen(PRESETS_REG, EXAMPLE_CUSTOMERS, startSel); decodeIn(root); updateSummaryBar(); return; }
+    if (view === 'landing') { root.innerHTML = nav + C.landingPanel(landingMeta, PRESETS_REG); decodeIn(root); updateSummaryBar(); return; }
     else if (view === 'meeting') renderMeeting();
     else renderArchitect();
     updateSummaryBar();
@@ -451,6 +453,12 @@ export function createApp(root, data) {
     if (b.dataset.pattern !== undefined) { startSel.pattern = b.dataset.pattern; render(); return; }
     if (b.dataset.persona !== undefined) { applyPersonaFlow(Number(b.dataset.persona)); return; }
     if (b.id === 'start-go') { applyPatternFlow(); return; }
+    if (b.dataset.navReset) {
+      state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null;
+      startSel = { pattern: null, scale: 'department', data: 'yes' };
+      X.persistence.autosave(state, weightOverrides);
+      view = 'start'; meetingStep = 0; render(); window.scrollTo(0, 0); return;
+    }
     if (b.dataset.goto === 'meeting-answer') { view = 'meeting'; meetingStep = MEETING_STEPS.length; render(); window.scrollTo(0, 0); return; }
     if (b.dataset.goto) { view = b.dataset.goto; meetingStep = 0; render(); window.scrollTo(0, 0); return; }
     if (b.dataset.wiz === 'next') { meetingStep++; renderMeeting(); updateSummaryBar(); window.scrollTo(0, 0); return; }
