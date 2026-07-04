@@ -275,6 +275,21 @@ export function decisionCard(state, fin, providerMonthlyCost, ceiling) {
   </div>`;
 }
 
+/* The all-HPE conversation configuration: the parts list the ceiling must
+   cover. No prices, ever; the ceiling IS the price conversation. */
+export function hpeConfigCard(cfg, sources) {
+  if (!cfg) return '';
+  return `<div class="card" id="hpe-config-card">
+    <h3 class="card-title">The configuration (all HPE, no prices, one bar to clear)</h3>
+    <p class="config-budget">${esc(cfg.budgetLine)}</p>
+    <div class="table-wrap"><table class="cmp-table"><thead><tr><th>qty</th><th>item</th><th>sized by your numbers</th><th>source</th></tr></thead><tbody>
+      ${cfg.lines.map((l) => `<tr><td class="mono num">${l.qty}x</td><td><b>${esc(l.item)}</b></td><td>${esc(l.detail)}</td><td>${sourceLinkPills([l.sourceId], sources)}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="dim">${esc(cfg.alt)}</p>
+    <ol class="dim" style="font-size:0.82rem">${cfg.caveats.map((c) => `<li>${esc(c)}</li>`).join('')}</ol>
+  </div>`;
+}
+
 export function optimizationCard(levers) {
   if (!levers?.length) return '';
   return `<div class="card">

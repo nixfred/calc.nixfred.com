@@ -1,21 +1,171 @@
 [
-  { "id": "field_heuristic", "label": "Field sizing heuristic", "url": "https://github.com/nixfred/calc.nixfred.com/blob/main/docs/tokenops.md", "sourceType": "methodology", "vendor": "calc.nixfred.com", "lastReviewed": "2026-07-03", "note": "Editable rule-of-thumb constants from field sizing practice. Documented in the methodology page." },
-  { "id": "openai_api_pricing", "label": "OpenAI API pricing", "url": "https://developers.openai.com/api/docs/pricing", "sourceType": "provider pricing", "vendor": "OpenAI", "lastReviewed": "2026-07-03" },
-  { "id": "anthropic_pricing", "label": "Anthropic Claude pricing", "url": "https://platform.claude.com/docs/en/about-claude/pricing", "sourceType": "provider pricing", "vendor": "Anthropic", "lastReviewed": "2026-07-03" },
-  { "id": "gemini_api_pricing", "label": "Google Gemini API pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "sourceType": "provider pricing", "vendor": "Google", "lastReviewed": "2026-07-03" },
-  { "id": "aws_bedrock_pricing", "label": "AWS Bedrock pricing", "url": "https://aws.amazon.com/bedrock/pricing/", "sourceType": "cloud provider pricing", "vendor": "AWS", "lastReviewed": "2026-07-03" },
-  { "id": "azure_openai_pricing", "label": "Azure OpenAI pricing", "url": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/", "sourceType": "cloud provider pricing", "vendor": "Microsoft Azure", "lastReviewed": "2026-07-03" },
-  { "id": "airia_platform", "label": "Airia AI platform", "url": "https://airia.com/ai-platform/", "sourceType": "agent platform", "vendor": "Airia", "lastReviewed": "2026-07-03" },
-  { "id": "kamiwaza_product", "label": "Kamiwaza product platform", "url": "https://www.kamiwaza.ai/product", "sourceType": "private AI orchestration platform", "vendor": "Kamiwaza", "lastReviewed": "2026-07-03" },
-  { "id": "btg_ai_consulting", "label": "Build Technology Group AI consulting", "url": "https://buildtechnologygroup.com/", "sourceType": "strategy and build partner", "vendor": "Build Technology Group", "lastReviewed": "2026-07-03" },
-  { "id": "hpe_dl380a_gen12", "label": "HPE ProLiant Compute DL380a Gen12", "url": "https://www.hpe.com/us/en/compute/hpe-proliant-compute/dl380a-gen12.html", "sourceType": "server product page", "vendor": "HPE", "lastReviewed": "2026-07-03" },
-  { "id": "hpe_xd685", "label": "HPE ProLiant Compute XD685", "url": "https://buy.hpe.com/in/en/compute/rack-servers/proliant-compute-xd600-servers/hpe-proliant-compute-xd685/p/1014862906", "sourceType": "server product page", "vendor": "HPE", "lastReviewed": "2026-07-03" },
-  { "id": "hpe_private_cloud_ai", "label": "HPE Private Cloud AI", "url": "https://www.hpe.com/us/en/private-cloud-ai.html", "sourceType": "private AI platform", "vendor": "HPE", "lastReviewed": "2026-07-03" },
-  { "id": "nvidia_rtx_pro_6000_blackwell", "label": "NVIDIA RTX PRO 6000 Blackwell Server Edition", "url": "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/", "sourceType": "GPU product page", "vendor": "NVIDIA", "lastReviewed": "2026-07-03" },
-  { "id": "nvidia_h200", "label": "NVIDIA H200 Tensor Core GPU", "url": "https://www.nvidia.com/en-us/data-center/h200/", "sourceType": "GPU product page", "vendor": "NVIDIA", "lastReviewed": "2026-07-03" },
-  { "id": "amd_mi355x", "label": "AMD Instinct MI355X accelerator", "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html", "sourceType": "GPU product page", "vendor": "AMD", "lastReviewed": "2026-07-03" },
-  { "id": "lambda_pricing", "label": "Lambda GPU pricing", "url": "https://lambda.ai/pricing", "sourceType": "GPU rental pricing", "vendor": "Lambda", "lastReviewed": "2026-07-03" },
-  { "id": "vllm_optimization", "label": "vLLM optimization documentation", "url": "https://docs.vllm.ai/en/stable/configuration/optimization/", "sourceType": "model serving methodology", "vendor": "vLLM", "lastReviewed": "2026-07-03" },
-  { "id": "nvidia_genai_perf", "label": "NVIDIA GenAI Perf documentation", "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_analyzer/genai-perf/README.html", "sourceType": "benchmark methodology", "vendor": "NVIDIA", "lastReviewed": "2026-07-03" },
-  { "id": "mlcommons_inference", "label": "MLCommons Datacenter Inference benchmark", "url": "https://mlcommons.org/benchmarks/inference-datacenter/", "sourceType": "benchmark methodology", "vendor": "MLCommons", "lastReviewed": "2026-07-03" }
+  {
+    "id": "field_heuristic",
+    "label": "Field sizing heuristic",
+    "url": "https://github.com/nixfred/calc.nixfred.com/blob/main/docs/tokenops.md",
+    "sourceType": "methodology",
+    "vendor": "calc.nixfred.com",
+    "lastReviewed": "2026-07-03",
+    "note": "Editable rule-of-thumb constants from field sizing practice. Documented in the methodology page."
+  },
+  {
+    "id": "openai_api_pricing",
+    "label": "OpenAI API pricing",
+    "url": "https://developers.openai.com/api/docs/pricing",
+    "sourceType": "provider pricing",
+    "vendor": "OpenAI",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "anthropic_pricing",
+    "label": "Anthropic Claude pricing",
+    "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "sourceType": "provider pricing",
+    "vendor": "Anthropic",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "gemini_api_pricing",
+    "label": "Google Gemini API pricing",
+    "url": "https://ai.google.dev/gemini-api/docs/pricing",
+    "sourceType": "provider pricing",
+    "vendor": "Google",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "aws_bedrock_pricing",
+    "label": "AWS Bedrock pricing",
+    "url": "https://aws.amazon.com/bedrock/pricing/",
+    "sourceType": "cloud provider pricing",
+    "vendor": "AWS",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "azure_openai_pricing",
+    "label": "Azure OpenAI pricing",
+    "url": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/",
+    "sourceType": "cloud provider pricing",
+    "vendor": "Microsoft Azure",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "airia_platform",
+    "label": "Airia AI platform",
+    "url": "https://airia.com/ai-platform/",
+    "sourceType": "agent platform",
+    "vendor": "Airia",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "kamiwaza_product",
+    "label": "Kamiwaza product platform",
+    "url": "https://www.kamiwaza.ai/product",
+    "sourceType": "private AI orchestration platform",
+    "vendor": "Kamiwaza",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "btg_ai_consulting",
+    "label": "Build Technology Group AI consulting",
+    "url": "https://buildtechnologygroup.com/",
+    "sourceType": "strategy and build partner",
+    "vendor": "Build Technology Group",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "hpe_dl380a_gen12",
+    "label": "HPE ProLiant Compute DL380a Gen12",
+    "url": "https://www.hpe.com/us/en/compute/hpe-proliant-compute/dl380a-gen12.html",
+    "sourceType": "server product page",
+    "vendor": "HPE",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "hpe_xd685",
+    "label": "HPE ProLiant Compute XD685",
+    "url": "https://buy.hpe.com/in/en/compute/rack-servers/proliant-compute-xd600-servers/hpe-proliant-compute-xd685/p/1014862906",
+    "sourceType": "server product page",
+    "vendor": "HPE",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "hpe_private_cloud_ai",
+    "label": "HPE Private Cloud AI",
+    "url": "https://www.hpe.com/us/en/private-cloud-ai.html",
+    "sourceType": "private AI platform",
+    "vendor": "HPE",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "nvidia_rtx_pro_6000_blackwell",
+    "label": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "url": "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/",
+    "sourceType": "GPU product page",
+    "vendor": "NVIDIA",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "nvidia_h200",
+    "label": "NVIDIA H200 Tensor Core GPU",
+    "url": "https://www.nvidia.com/en-us/data-center/h200/",
+    "sourceType": "GPU product page",
+    "vendor": "NVIDIA",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "amd_mi355x",
+    "label": "AMD Instinct MI355X accelerator",
+    "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html",
+    "sourceType": "GPU product page",
+    "vendor": "AMD",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "lambda_pricing",
+    "label": "Lambda GPU pricing",
+    "url": "https://lambda.ai/pricing",
+    "sourceType": "GPU rental pricing",
+    "vendor": "Lambda",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "hpe_alletra_mp",
+    "label": "HPE Alletra Storage MP",
+    "url": "https://www.hpe.com/us/en/hpe-alletra-storage-mp.html",
+    "sourceType": "storage product page",
+    "vendor": "HPE",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "hpe_networking_ai",
+    "label": "HPE networking for AI fabrics",
+    "url": "https://www.hpe.com/us/en/networking.html",
+    "sourceType": "networking product page",
+    "vendor": "HPE",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "vllm_optimization",
+    "label": "vLLM optimization documentation",
+    "url": "https://docs.vllm.ai/en/stable/configuration/optimization/",
+    "sourceType": "model serving methodology",
+    "vendor": "vLLM",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "nvidia_genai_perf",
+    "label": "NVIDIA GenAI Perf documentation",
+    "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_analyzer/genai-perf/README.html",
+    "sourceType": "benchmark methodology",
+    "vendor": "NVIDIA",
+    "lastReviewed": "2026-07-03"
+  },
+  {
+    "id": "mlcommons_inference",
+    "label": "MLCommons Datacenter Inference benchmark",
+    "url": "https://mlcommons.org/benchmarks/inference-datacenter/",
+    "sourceType": "benchmark methodology",
+    "vendor": "MLCommons",
+    "lastReviewed": "2026-07-03"
+  }
 ]
