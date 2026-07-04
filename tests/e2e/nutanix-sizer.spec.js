@@ -46,12 +46,26 @@ test('sizer navigation: anchors plus a real Start over (same treatment as TokenO
   }
   await expect(page.locator('.app-nav a[href="/howto/nutanix-sizer"]')).toBeVisible();
   await expect(page.locator('.app-nav a[href="/"]')).toBeVisible();
-  // Start over wipes edits.
-  await page.fill('input[data-ns="vmCount"]', '999');
+  // Start over wipes the ENTIRE surface: every number, every select,
+  // preset side-effects, and the URL hash (same audit that caught the
+  // TokenOps rates leak, applied here 2026-07-03: clean).
+  await page.evaluate(() => { location.hash = '#ns-formulas'; });
+  const fields = await page.evaluate(() => [...document.querySelectorAll('input[data-ns]')].map((i) => i.dataset.ns));
+  for (const f of fields) await page.fill(`input[data-ns="${f}"]`, '7');
+  await page.selectOption('select[data-ns="rf"]', 'ecx42');
+  await page.selectOption('select[data-ns="cvmProfile"]', 'light');
+  await page.selectOption('select[data-ns="workloadType"]', 'database');
   await page.waitForTimeout(300);
   await page.locator('.nav-reset').click();
-  const s = await page.evaluate(() => window.__sizer.getState());
-  expect(s.vmCount).toBe(200);
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => ({ s: window.__sizer.getState(), hash: location.hash }));
+  expect(after.hash).toBe('');
+  expect(after.s.vmCount).toBe(200);
+  expect(after.s.rf).toBe('rf2');
+  expect(after.s.cvmProfile).toBe('standard');
+  expect(after.s.workloadType).toBe('general');
+  expect(after.s.vcpuToPcpu).toBe(4);
+  expect(after.s.nodeRawTb).toBe(30.72);
 });
 
 test('the answer speaks HPE DX and shows the iron card (Fred bonus, 2026-07-03)', async ({ page }) => {
