@@ -135,6 +135,22 @@ export function startScreen(presets, personas, sel) {
     </div>`;
 }
 
+/* Persistent in-app navigation: no view is ever a dead end (Fred: "I kinda
+   trapped", 2026-07-03). Current view highlighted, landing appears once a
+   starting point exists. */
+export function appNav(view, hasLanding) {
+  const item = (v, label) => `<button type="button" class="nav-item ${view === v ? 'on' : ''}" data-goto="${v}">${label}</button>`;
+  return `<nav class="app-nav mono" aria-label="Calculator navigation">
+    ${item('start', 'Start')}
+    ${hasLanding ? item('landing', 'Starting point') : ''}
+    ${item('meeting-answer', 'Answer')}
+    ${item('architect', 'Every dial')}
+    <a class="nav-item" href="/howto/tokenops">Manual</a>
+    <a class="nav-item" href="/">All calculators</a>
+    <button type="button" class="nav-item nav-reset" data-nav-reset="1" title="Wipe inputs and begin fresh">Start over</button>
+  </nav>`;
+}
+
 export function landingPanel(meta, presets) {
   const rows = (meta.assumptions ?? []).map((a) => `
     <tr class="${a.verify ? 'verify-row' : ''}">

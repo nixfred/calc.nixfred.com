@@ -262,3 +262,11 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .landing-story { color: var(--muted); font-size: 1.02rem; max-width: 46rem; }
 .verify-flag { font-size: 0.6rem; color: #e8c98a; border: 1px solid #6b5a2e; border-radius: 4px; padding: 0.1rem 0.35rem; letter-spacing: 0.08em; }
 .verify-row td { background: rgba(255, 190, 80, 0.04); }
+
+/* ---------- persistent app nav (no dead ends) ---------- */
+.app-nav { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin: 0 0 1.2rem; }
+.nav-item { background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 0.3rem 0.85rem; font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; text-decoration: none; }
+.nav-item:hover { border-color: var(--accent); color: var(--accent-soft); text-decoration: none; }
+.nav-item.on { color: var(--accent); border-color: var(--accent); }
+.nav-reset { margin-left: auto; color: #e8c98a; border-color: #6b5a2e; }
+.nav-reset:hover { border-color: #e8c98a; color: #e8c98a; }

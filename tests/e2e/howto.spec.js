@@ -22,14 +22,14 @@ test('Sizer manual loads with the load-bearing sections', async ({ page }) => {
 
 test('both calculators link to their manuals', async ({ page }) => {
   await page.goto('/tokenops/');
-  await expect(page.locator('a[href="/howto/tokenops"]')).toBeVisible();
+  await expect(page.locator('a[href="/howto/tokenops"]').first()).toBeVisible();
   await page.goto('/nutanix-sizer/');
-  await expect(page.locator('a[href="/howto/nutanix-sizer"]')).toBeVisible();
+  await expect(page.locator('a[href="/howto/nutanix-sizer"]').first()).toBeVisible();
 });
 
 test('manuals cross-link each other', async ({ page }) => {
   await page.goto('/howto/tokenops');
-  await expect(page.locator('a[href="/howto/nutanix-sizer"]')).toBeVisible();
+  await expect(page.locator('a[href="/howto/nutanix-sizer"]').first()).toBeVisible();
   await page.goto('/howto/nutanix-sizer');
-  await expect(page.locator('a[href="/howto/tokenops"]')).toBeVisible();
+  await expect(page.locator('a[href="/howto/tokenops"]').first()).toBeVisible();
 });

@@ -203,8 +203,8 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
 test.describe('Section 0 settled decisions', () => {
   test('0.1.2 chooser screen first with both modes', async ({ page }) => {
     await page.goto('/tokenops/');
-    await expect(page.locator('button[data-goto="meeting"]')).toBeVisible();
-    await expect(page.locator('button[data-goto="architect"]')).toBeVisible();
+    await expect(page.locator('button[data-goto="meeting"]').first()).toBeVisible();
+    await expect(page.locator('button[data-goto="architect"]').first()).toBeVisible();
   });
 
   test('0.2.7 co-recommend logic exists; 0.2.8 do-not-size fires on missing gates', async ({ page }) => {
@@ -361,7 +361,7 @@ test('20c: presets are the front door - pattern wizard routes to a landing with 
   expect(s.users).toBe(240);
   expect(s.dataCanLeave).toBe('with-controls');
   expect(s.ragEnabled).toBe(true);
-  await page.locator('button[data-goto="meeting-answer"]').click();
+  await page.locator('button.primary[data-goto="meeting-answer"]').click();
   await expect(page.locator('.rec-headline').first()).toBeVisible();
 });
 
@@ -375,6 +375,30 @@ test('20c: example Customers load as flagship presets with variable teaching not
   const s = await page.evaluate(() => window.__tokenops.getState());
   expect(s.users).toBe(240);
   expect(s.chunksRetrievedPerQuery).toBe(8);
-  await page.locator('button[data-goto="meeting-answer"]').click();
+  await page.locator('button.primary[data-goto="meeting-answer"]').click();
   await expect(page.locator('#inputs-recap')).toBeVisible();
+});
+
+test('navigation: no view is a dead end (Fred: trapped)', async ({ page }) => {
+  await page.goto('/tokenops/');
+  // Start screen carries the nav.
+  await expect(page.locator('.app-nav')).toBeVisible();
+  // Load a persona, land, then walk: landing -> answer -> architect -> landing -> start.
+  await page.locator('.persona-card[data-persona="0"]').click();
+  await expect(page.locator('.nav-item.on', { hasText: 'Starting point' })).toBeVisible();
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  await expect(page.locator('.rec-headline').first()).toBeVisible();
+  await expect(page.locator('button', { hasText: 'back to your starting point' })).toBeVisible();
+  await page.locator('.app-nav .nav-item', { hasText: 'Every dial' }).click();
+  await expect(page.locator('.a-section').first()).toBeVisible();
+  await page.locator('.app-nav .nav-item', { hasText: 'Starting point' }).click();
+  await expect(page.locator('h1')).toContainText('Calloway Reed');
+  // Start over resets state and returns to start.
+  await page.locator('.nav-reset').click();
+  await expect(page.locator('.start h1')).toContainText('What are you building?');
+  const s = await page.evaluate(() => window.__tokenops.getState());
+  expect(s.users).toBe(200); // defaults restored
+  // Legacy chooser is retired: any old goto lands on start, never a trap.
+  await page.evaluate(() => { window.__tokenops._test.reset(); });
+  await expect(page.locator('.start h1')).toBeVisible();
 });
