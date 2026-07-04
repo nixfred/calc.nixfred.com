@@ -76,11 +76,18 @@ test('the answer speaks HPE DX and shows the iron card (Fred bonus, 2026-07-03)'
   await expect(page.locator('#dx-config-card .src-pill').first()).toContainText('DX380 Gen11');
 });
 
-test('teach layer reaches the sizer inputs too', async ({ page }) => {
+test('teach layer: EVERY sizer input has a working four-section popover (full audit 2026-07-03)', async ({ page }) => {
   await page.goto('/nutanix-sizer/');
-  expect(await page.locator('.info-btn').count()).toBeGreaterThan(10);
-  await page.locator('.info-btn[data-teach="sizer-rf"]').click();
-  await expect(page.locator('.teach-pop')).toContainText('the math it drives');
-  await page.keyboard.press('Escape');
+  // Exact coverage: one (i) per input, no orphans either way.
+  const inputs = await page.evaluate(() => [...document.querySelectorAll('[data-ns]')].map((el) => el.dataset.ns));
+  expect(inputs.length).toBe(15);
+  expect(await page.locator('.info-btn').count()).toBe(15);
+  for (const key of inputs) {
+    await page.locator(`.info-btn[data-teach="sizer-${key}"]`).click();
+    const pop = page.locator('.teach-pop');
+    await expect(pop.locator('.teach-k')).toHaveCount(4);
+    await expect(pop.locator('.teach-links a').first()).toHaveAttribute('href', /^https:\/\//);
+    await page.keyboard.press('Escape');
+  }
   await expect(page.locator('#teach-overlay')).toHaveCount(0);
 });
