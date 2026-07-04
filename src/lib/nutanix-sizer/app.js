@@ -5,6 +5,7 @@ import { fmt } from '../tokenops/engine.js';
 import { formulaTrace } from '../tokenops/components.js';
 import { sizerEngine, SIZER_DEFAULTS, PRESETS, RF, CVM, applyPreset } from './formulas.js';
 import { infoButton, openTeach } from '../tokenops/teach.js';
+import { SIZER_CATEGORIES, SIZER_PERSONAS, SIZER_SOURCE_LINKS } from './presets.js';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -18,6 +19,99 @@ export const SIZER_SOURCES = [
 export function createSizer(root, summaryEl) {
   let state = structuredClone(SIZER_DEFAULTS);
   let timer = null;
+  let view = 'start';
+  let landingMeta = null;
+  let startCat = null;
+
+  const navPills = () => `<nav class="app-nav mono" aria-label="Calculator navigation">
+    <button type="button" class="nav-item ${view === 'start' ? 'on' : ''}" data-goto="start">Start</button>
+    ${landingMeta ? `<button type="button" class="nav-item ${view === 'landing' ? 'on' : ''}" data-goto="landing">Starting point</button>` : ''}
+    <button type="button" class="nav-item" data-goto="tool-answer">The answer</button>
+    <button type="button" class="nav-item ${view === 'tool' ? 'on' : ''}" data-goto="tool">Every dial</button>
+    <a class="nav-item" href="/howto/nutanix-sizer">Manual</a>
+    <a class="nav-item" href="/">All calculators</a>
+    <button type="button" class="nav-item nav-reset" data-ns-reset="1" title="Wipe inputs and begin fresh">Start over</button>
+  </nav>`;
+
+  function applyCategory(key) {
+    const cat = SIZER_CATEGORIES[key];
+    state = { ...structuredClone(SIZER_DEFAULTS), ...cat.patch };
+    landingMeta = { title: cat.label, tagline: cat.tagline, howCommon: cat.howCommon, assumptions: cat.assumptions, variableNotes: null };
+    view = 'landing';
+    render(); window.scrollTo(0, 0);
+  }
+
+  function applyPersona(idx) {
+    const p = SIZER_PERSONAS[idx];
+    state = { ...structuredClone(SIZER_DEFAULTS), ...p.inputs };
+    landingMeta = {
+      title: p.companyName, story: p.story, groundedIn: p.groundedIn,
+      assumptions: (p.variableNotes ?? []).map((n) => ({ label: `${n.variable} = ${n.value}`, why: n.meaning, verify: true })).slice(0, 5),
+      variableNotes: p.variableNotes,
+    };
+    view = 'landing';
+    render(); window.scrollTo(0, 0);
+  }
+
+  function renderStart() {
+    const cats = Object.entries(SIZER_CATEGORIES).map(([k, c]) => `
+      <button type="button" class="pattern-card ${startCat === k ? 'on' : ''}" data-cat="${k}">
+        <span class="pc-label">${esc(c.label)}</span>
+        <span class="pc-tag dim">${esc(c.tagline)}</span>
+        <span class="pc-common mono">${esc(c.howCommon.split(';')[0].split(':')[0])}</span>
+      </button>`).join('');
+    const personas = SIZER_PERSONAS.map((p, i) => `
+      <button type="button" class="persona-card" data-spersona="${i}">
+        <span class="pc-tier mono">${esc(p.tier.toUpperCase())}</span>
+        <span class="pc-label">${esc(p.companyName)}</span>
+        <span class="pc-tag dim">${esc(p.industry)}</span>
+      </button>`).join('');
+    root.innerHTML = `${navPills()}
+      <div class="start">
+        <h1>What are you sizing?</h1>
+        <p class="dim">Every session starts from a real Nutanix workload pattern, grounded in the public field guide's sizing rules and reference architectures. Every assumption shown and adjustable.</p>
+        <div class="pattern-grid">${cats}</div>
+        <p class="section-label" style="margin-top:2.2rem">or walk in an example Customer's shoes</p>
+        <div class="persona-row">${personas}</div>
+        <p class="dim start-skip">Prefer a blank sheet? <button class="linklike" data-goto="tool">Open every dial</button></p>
+      </div>`;
+    if (summaryEl) summaryEl.classList.add('hidden');
+  }
+
+  function renderLanding() {
+    if (!landingMeta) { view = 'start'; renderStart(); return; }
+    const rows = (landingMeta.assumptions ?? []).map((a) => `
+      <tr class="${a.verify ? 'verify-row' : ''}">
+        <td>${a.verify ? '<span class="verify-flag mono">VERIFY</span>' : ''}</td>
+        <td><b>${esc(a.label)}</b><br><span class="dim">${esc(a.why)}</span></td>
+        <td><button class="linklike" data-goto="tool">adjust</button></td>
+      </tr>`).join('');
+    const notes = landingMeta.variableNotes?.length ? `
+      <details class="weight-group" open><summary>Every number, explained: what it means and what it drives</summary>
+        <div class="table-wrap"><table class="cmp-table"><thead><tr><th>variable</th><th>value</th><th>what it means here</th><th>what it drives</th></tr></thead><tbody>
+          ${landingMeta.variableNotes.map((n) => `<tr><td class="mono">${esc(n.variable)}</td><td class="mono num">${esc(n.value)}</td><td>${esc(n.meaning)}</td><td>${esc(n.drives)}</td></tr>`).join('')}
+        </tbody></table></div>
+      </details>` : '';
+    root.innerHTML = `${navPills()}
+      <div class="wizard" style="max-width: 52rem;">
+        <h1>${esc(landingMeta.title)}</h1>
+        ${landingMeta.story ? `<p class="landing-story">${esc(landingMeta.story)}</p>` : `<p class="dim">${esc(landingMeta.tagline ?? '')}</p>`}
+        ${landingMeta.howCommon ? `<p class="dim"><span class="k">from the field guide</span> ${esc(landingMeta.howCommon)}</p>` : ''}
+        ${landingMeta.groundedIn ? `<p class="dim"><span class="k">grounded in</span> ${esc(landingMeta.groundedIn)} <a href="${SIZER_SOURCE_LINKS.arch}" target="_blank" rel="noopener">(source)</a></p>` : ''}
+        <div class="card">
+          <h3 class="card-title">What we just assumed for you</h3>
+          <p class="dim">Starting points from the guide, not truths. The flagged rows are the ones to verify with the Customer.</p>
+          <div class="table-wrap"><table class="cmp-table"><tbody>${rows}</tbody></table></div>
+        </div>
+        ${notes}
+        <div class="btn-row">
+          <button class="primary" data-goto="tool-answer">See the answer</button>
+          <button data-goto="tool">Open every dial</button>
+          <button data-goto="start">Start over</button>
+        </div>
+      </div>`;
+    if (summaryEl) summaryEl.classList.add('hidden');
+  }
 
   const F = [
     ['vmCount', 'VM count', 'number'],
@@ -107,22 +201,20 @@ export function createSizer(root, summaryEl) {
       ${order.map((id) => formulaTrace(traces[id], SIZER_SOURCES)).join('')}`;
   }
 
-  function render() {
-    root.innerHTML = `
-      <nav class="app-nav mono" aria-label="Calculator navigation">
-        <a class="nav-item" href="#ns-estate">The estate</a>
-        <a class="nav-item" href="#ns-results">The answer</a>
-        <a class="nav-item" href="#ns-formulas">Every formula</a>
-        <a class="nav-item" href="/howto/nutanix-sizer">Manual</a>
-        <a class="nav-item" href="/">All calculators</a>
-        <button type="button" class="nav-item nav-reset" data-ns-reset="1" title="Wipe inputs and begin fresh">Start over</button>
-      </nav>
+  function renderTool() {
+    root.innerHTML = `${navPills()}
       <section class="a-section" id="ns-estate"><h2 class="a-title">The estate</h2>
         <p class="dim">Rough conversation sizing from the public NutaNIX field guide, appendix F. Ranges on purpose. Not a quote, not formal sizing.</p>
         <div id="ns-inputs">${inputsHtml()}</div>
       </section>
       <section id="ns-results">${resultsHtml()}</section>`;
     updateSummary();
+  }
+
+  function render() {
+    if (view === 'start') { renderStart(); return; }
+    if (view === 'landing') { renderLanding(); return; }
+    renderTool();
   }
 
   function refresh() {
@@ -156,8 +248,16 @@ export function createSizer(root, summaryEl) {
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (b?.dataset.teach) { openTeach(b.dataset.teach); return; }
+    if (b?.dataset.cat) { startCat = b.dataset.cat; applyCategory(b.dataset.cat); return; }
+    if (b?.dataset.spersona !== undefined && b?.dataset.spersona !== null && b.dataset.spersona !== '') { applyPersona(Number(b.dataset.spersona)); return; }
+    if (b?.dataset.goto) {
+      const g = b.dataset.goto;
+      if (g === 'tool-answer') { view = 'tool'; render(); document.getElementById('ns-results')?.scrollIntoView(); return; }
+      view = g; render(); window.scrollTo(0, 0); return;
+    }
     if (b?.dataset.nsReset) {
       state = structuredClone(SIZER_DEFAULTS);
+      landingMeta = null; startCat = null; view = 'start';
       history.replaceState(null, '', location.pathname);
       render();
       window.scrollTo(0, 0);

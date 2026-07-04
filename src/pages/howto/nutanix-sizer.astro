@@ -25,8 +25,16 @@ import '../../styles/tokenops.css';
       </div>
 
       <div class="card">
-        <h3 class="card-title">2. The inputs, in the order that matters</h3>
-        <p><strong>Workload preset first.</strong> General virtualization, VDI, or Database. The preset sets four things at once: the vCPU-to-physical-core ratio, compression and dedup expectations, and the CVM profile. Presets are honest starting points, not answers; every value stays editable after you pick one.</p>
+        <h3 class="card-title">2. The front door: what are you sizing?</h3>
+        <p>The tool opens by asking what you are sizing. Nine workload patterns from the field guide (general virtualization, VDI, database, files, objects, Kubernetes, ROBO and edge, DR target, backup repository), plus three example Customers you can walk in as. Picking a pattern lands you on a starting point with every assumption stated, cited to the guide, and flagged where you must verify it with the Customer before quoting the range out loud.</p>
+        <p>From the landing you choose the depth: <strong>See the answer</strong> jumps straight to the node range, <strong>Open every dial</strong> drops you into the full manual surface with all fifteen inputs live, and <strong>Start over</strong> wipes everything back to the front door. The manual surface is always one click away and nothing about it changed; the patterns just decide where the dials start.</p>
+        <p>The three example Customers (Beacon Ridge Credit Union, Cardinal Freight Systems, Meridian Health Network) are fake companies carrying real-magnitude estates anchored to the guide's small, medium, and large reference architectures, each with a variable-by-variable explanation of what every number means and what it drives. They double as the best way to learn the tool.</p>
+        <p>Prefer the blank sheet? The front door has a skip link that opens every dial at the defaults, exactly the tool as it always was.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">3. The inputs, in the order that matters</h3>
+        <p><strong>Workload pattern first.</strong> Normally the front door already set this. Inside the tool the quick dropdown carries the three most common patterns (general virtualization, VDI, database) and each pattern sets four things at once: the vCPU-to-physical-core ratio, compression and dedup expectations, and the CVM profile. Patterns are honest starting points, not answers; every value stays editable after you pick one.</p>
         <p><strong>The estate.</strong> VM count, average vCPU, average RAM, used storage in TB. Averages are fine here; that is what a conversation-grade estimate means. If the Customer has RVTools-style actuals, even better, type those.</p>
         <p><strong>Growth.</strong> Annual percent and the sizing window, default 24 months. The guide's rule: size for 18 to 24 months of growth, then plan to add nodes. Sizing for five years buys idle hardware; sizing for today fills the cluster the day the growth arrives.</p>
         <p><strong>Data protection.</strong> RF2, RF3, or erasure coding. This is the biggest storage lever in the tool:</p>
@@ -42,7 +50,7 @@ import '../../styles/tokenops.css';
       </div>
 
       <div class="card">
-        <h3 class="card-title">3. How the range is built (the whole chain is on the page)</h3>
+        <h3 class="card-title">4. How the range is built (the whole chain is on the page)</h3>
         <ol>
           <li>Growth compounds the estate over the window.</li>
           <li>Raw becomes usable: the RF multiplier, minus the 10 to 15 percent platform reservation.</li>
@@ -55,7 +63,7 @@ import '../../styles/tokenops.css';
       </div>
 
       <div class="card">
-        <h3 class="card-title">4. The four outputs and what to do with each</h3>
+        <h3 class="card-title">5. The four outputs and what to do with each</h3>
         <ol>
           <li><strong>The answer.</strong> One sentence: "This estate fits in roughly N to M nodes of this profile at RF2," with the binding gate named. Say it out loud exactly as written, range and all.</li>
           <li><strong>The whiteboard card.</strong> Five lines built to be copied onto an actual whiteboard: estate, range, effective per node, CVM tax, and the pre-sizer disclaimer. The copy button gives you plain text.</li>
@@ -65,7 +73,7 @@ import '../../styles/tokenops.css';
       </div>
 
       <div class="card">
-        <h3 class="card-title">5. Three conversation plays</h3>
+        <h3 class="card-title">6. Three conversation plays</h3>
         <ol>
           <li><strong>The ballpark ask.</strong> "Just roughly, what would we need?" Type the four estate numbers, read the answer sentence, then screenshot the whiteboard card into the follow-up email. Total elapsed time: under two minutes, and nothing you said tonight contradicts what Sizer says next week, because you quoted a range.</li>
           <li><strong>The CVM objection.</strong> A competitor said the storage controller eats the cluster. Open the CPU gate formula card and show the subtraction happening: 12 vCPUs and 48 GB per node, taken off the top, in the math. Honest numbers beat defensive talking points.</li>
@@ -74,7 +82,7 @@ import '../../styles/tokenops.css';
       </div>
 
       <div class="card">
-        <h3 class="card-title">6. Limits, stated plainly</h3>
+        <h3 class="card-title">7. Limits, stated plainly</h3>
         <ol>
           <li>This is a pre-sizer estimate within roughly 25 percent, for conversations. Nutanix Sizer with real workload data produces proposals.</li>
           <li>The overcommit ratios are field heuristics; the guide publishes none. Edit them to your own beliefs.</li>
