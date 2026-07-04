@@ -11,6 +11,7 @@ import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LAB
 import * as C from './components.js';
 import * as X from './exports.js';
 import PRESETS_REG from '../../data/tokenops/presets.json';
+import { infoButton, openTeach } from './teach.js';
 import EXAMPLE_CUSTOMERS from '../../data/tokenops/example-customers.json';
 
 export const VERSION = 'v1.0.0';
@@ -149,7 +150,7 @@ export function createApp(root, data) {
       if (choices === 'HARDWARE') choices = hardware.filter((h) => h.category === 'GPU').map((h) => [h.id, `${h.vendor} ${h.name}`]);
       control = `<select id="${id}" data-field="${esc(f.key)}">${choices.map(([v, l]) => `<option value="${esc(v)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
     }
-    return `<div class="field"><label for="${id}">${esc(f.label)}</label>${control}${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ''}</div>`;
+    return `<div class="field"><label for="${id}">${esc(f.label)}${infoButton(f.key)}</label>${control}${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ''}</div>`;
   }
 
   function sectionTraces(sectionId, cx) {
@@ -457,6 +458,7 @@ export function createApp(root, data) {
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.teach) { openTeach(b.dataset.teach); return; }
     if (b.dataset.pattern !== undefined) { startSel.pattern = b.dataset.pattern; render(); return; }
     if (b.dataset.persona !== undefined) { applyPersonaFlow(Number(b.dataset.persona)); return; }
     if (b.id === 'start-go') { applyPatternFlow(); return; }

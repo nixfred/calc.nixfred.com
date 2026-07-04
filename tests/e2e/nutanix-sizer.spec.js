@@ -75,3 +75,12 @@ test('the answer speaks HPE DX and shows the iron card (Fred bonus, 2026-07-03)'
   await expect(page.locator('#dx-config-card')).toContainText('Not an orderable BOM');
   await expect(page.locator('#dx-config-card .src-pill').first()).toContainText('DX380 Gen11');
 });
+
+test('teach layer reaches the sizer inputs too', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  expect(await page.locator('.info-btn').count()).toBeGreaterThan(10);
+  await page.locator('.info-btn[data-teach="sizer-rf"]').click();
+  await expect(page.locator('.teach-pop')).toContainText('the math it drives');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#teach-overlay')).toHaveCount(0);
+});

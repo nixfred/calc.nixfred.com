@@ -4,6 +4,7 @@
 import { fmt } from '../tokenops/engine.js';
 import { formulaTrace } from '../tokenops/components.js';
 import { sizerEngine, SIZER_DEFAULTS, PRESETS, RF, CVM, applyPreset } from './formulas.js';
+import { infoButton, openTeach } from '../tokenops/teach.js';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -38,14 +39,14 @@ export function createSizer(root, summaryEl) {
   }
 
   function inputsHtml() {
-    const sel = (key, label, entries, cur) => `<div class="field"><label for="ns-${key}">${label}</label>
+    const sel = (key, label, entries, cur) => `<div class="field"><label for="ns-${key}">${label}${infoButton('sizer-' + key)}</label>
       <select id="ns-${key}" data-ns="${key}">${entries.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
     return `
       <div class="a-fields">
         ${sel('workloadType', 'Workload preset', Object.entries(PRESETS).map(([k, p]) => [k, p.label]), state.workloadType)}
         ${sel('rf', 'Data protection', Object.entries(RF).map(([k, r]) => [k, r.label]), state.rf)}
         ${sel('cvmProfile', 'CVM profile', Object.entries(CVM).map(([k, c]) => [k, `${c.label} (${c.vcpu} vCPU / ${c.ramGb} GB)`]), state.cvmProfile)}
-        ${F.map(([key, label]) => `<div class="field"><label for="ns-${key}">${label}</label><input id="ns-${key}" type="number" step="any" min="0" data-ns="${key}" value="${state[key]}"></div>`).join('')}
+        ${F.map(([key, label]) => `<div class="field"><label for="ns-${key}">${label}${infoButton('sizer-' + key)}</label><input id="ns-${key}" type="number" step="any" min="0" data-ns="${key}" value="${state[key]}"></div>`).join('')}
       </div>`;
   }
 
@@ -154,6 +155,7 @@ export function createSizer(root, summaryEl) {
 
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button');
+    if (b?.dataset.teach) { openTeach(b.dataset.teach); return; }
     if (b?.dataset.nsReset) {
       state = structuredClone(SIZER_DEFAULTS);
       history.replaceState(null, '', location.pathname);

@@ -272,3 +272,44 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .nav-reset:hover { border-color: #e8c98a; color: #e8c98a; }
 #ns-estate, #ns-results, #ns-formulas { scroll-margin-top: calc(var(--header-h) + 4.5rem); }
 .config-budget { font-size: 1.02rem; color: var(--text); border-left: 3px solid var(--accent); padding-left: 0.8rem; }
+
+/* ---------- the teach layer: glowing geek-tech popovers ---------- */
+.info-btn {
+  display: inline-grid; place-items: center; width: 1.05rem; height: 1.05rem;
+  margin-left: 0.35rem; padding: 0; border-radius: 50%;
+  border: 1px solid var(--border-bright); background: var(--surface);
+  color: var(--accent); font-family: var(--font-mono); font-size: 0.62rem; font-style: italic;
+  cursor: pointer; vertical-align: middle; line-height: 1;
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+.info-btn:hover { border-color: var(--accent); box-shadow: 0 0 8px rgba(77, 163, 255, 0.55); }
+
+#teach-overlay {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgba(4, 7, 13, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  padding: 1.2rem;
+}
+.teach-pop {
+  position: relative; max-width: 34rem; width: 100%; max-height: 85vh; overflow-y: auto;
+  background: linear-gradient(180deg, #0e1730, #0a1020);
+  border: 1px solid transparent; border-radius: 14px; padding: 1.5rem 1.6rem 1.3rem;
+  background-clip: padding-box;
+  box-shadow: 0 0 0 1px rgba(77, 163, 255, 0.55), 0 0 28px rgba(77, 163, 255, 0.22), 0 0 90px rgba(45, 110, 220, 0.18), inset 0 0 40px rgba(45, 110, 220, 0.06);
+  animation: teach-rise 260ms ease both;
+}
+@keyframes teach-rise { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+.teach-title { font-size: 1.15rem; font-weight: 700; margin: 0 1.8rem 0.8rem 0; color: #fff; }
+.teach-k { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.12em; color: var(--accent); text-transform: lowercase; display: block; margin: 0.9rem 0 0.25rem; text-shadow: 0 0 10px rgba(77, 163, 255, 0.5); }
+.teach-k::before { content: '// '; }
+.teach-pop p { margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.62; }
+.teach-links { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.3rem; }
+.teach-links a { font-size: 0.85rem; }
+.teach-links a::before { content: '\2197 '; font-family: var(--font-mono); color: var(--accent); }
+.teach-close {
+  position: absolute; top: 0.8rem; right: 0.9rem; width: 1.8rem; height: 1.8rem;
+  border-radius: 50%; border: 1px solid var(--border-bright); background: var(--surface);
+  color: var(--muted); font-size: 0.9rem; cursor: pointer; line-height: 1;
+}
+.teach-close:hover { color: var(--accent-soft); border-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .teach-pop { animation: none; } }
+@media (max-width: 640px) { #teach-overlay { align-items: end; padding: 0; } .teach-pop { border-radius: 14px 14px 0 0; max-height: 88vh; } }
