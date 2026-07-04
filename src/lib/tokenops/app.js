@@ -5,6 +5,7 @@
 import { engine } from './formulas.js';
 import { validateInputs, fmt, money } from './engine.js';
 import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers, primaryLeverOf, financeDecision } from './costs.js';
+import { buildHpeConfig } from './hpeConfig.js';
 import { recommend, confidence, discoveryQuestions, privatePolicyScore } from './routes.js';
 import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LABELS } from './sections.js';
 import * as C from './components.js';
@@ -122,7 +123,8 @@ export function createApp(root, data) {
     const fin = financeDecision(state, providerBaseline, ceiling);
     const disc = discoveryQuestions(state);
     const policy = privatePolicyScore(state, rules, weightOverrides);
-    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy, fin };
+    const hpeConfig = buildHpeConfig(state, values, ceiling, fin, hardware);
+    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy, fin, hpeConfig };
   }
 
   /* ---------- field rendering ---------- */
@@ -210,6 +212,7 @@ export function createApp(root, data) {
       ...(meeting ? [C.inputsRecapCard(state)] : []),
       C.recommendationCard(cx.rec, cx.conf, sources),
       econ,
+      C.hpeConfigCard(cx.hpeConfig, sources),
       C.optimizationCard(cx.levers),
       C.providerTable(cx.cmp, providerMeta, sources),
       wb,

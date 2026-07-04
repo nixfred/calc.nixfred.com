@@ -356,3 +356,28 @@ test('a $1 quote is called a typo, not a deal (Fred UX catch)', async () => {
   expect(real.verdict.implausible).toBeUndefined();
   expect(real.verdict.under).toBe(true);
 });
+
+/* ---------- all-HPE conversation configuration (Fred's go, 2026-07-03) ---------- */
+
+test('HPE config packs GPUs into the right chassis, no prices anywhere', async () => {
+  const { buildHpeConfig } = await import('../src/lib/tokenops/hpeConfig.js');
+  const { hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const hardware = (await import('../src/data/tokenops/hardware-profiles.json', { with: { type: 'json' } })).default;
+  const ceiling = hardwareCeiling(structuredClone(defaults), 10000);
+  // 24 H200s -> 3x XD685.
+  let cfg = buildHpeConfig({ ...structuredClone(defaults), gpuChoice: 'nvidia_h200' }, { recommendedGpuCount: 24, protectedStorageTB: 40 }, ceiling, null, hardware);
+  expect(cfg.servers).toBe(3);
+  expect(cfg.lines[0].item).toContain('XD685');
+  // 12 RTX PRO 6000 -> 2x DL380a Gen12.
+  cfg = buildHpeConfig({ ...structuredClone(defaults), gpuChoice: 'nvidia_rtx_pro_6000_blackwell' }, { recommendedGpuCount: 12, protectedStorageTB: 10 }, ceiling, null, hardware);
+  expect(cfg.servers).toBe(2);
+  expect(cfg.lines[0].item).toContain('DL380a');
+  // MI355X -> XD685.
+  cfg = buildHpeConfig({ ...structuredClone(defaults), gpuChoice: 'amd_mi355x' }, { recommendedGpuCount: 8, protectedStorageTB: 20 }, ceiling, null, hardware);
+  expect(cfg.servers).toBe(1);
+  expect(cfg.lines[0].item).toContain('XD685');
+  // The budget line carries the ceiling, and nothing in the card is a price of a part.
+  expect(cfg.budgetLine).toContain('must land under');
+  const together = JSON.stringify(cfg);
+  expect(together).not.toMatch(/\$\d+.*per (GPU|server|node)/);
+});

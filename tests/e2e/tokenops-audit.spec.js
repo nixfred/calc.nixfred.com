@@ -402,3 +402,16 @@ test('navigation: no view is a dead end (Fred: trapped)', async ({ page }) => {
   await page.evaluate(() => { window.__tokenops._test.reset(); });
   await expect(page.locator('.start h1')).toBeVisible();
 });
+
+test('HPE configuration card renders with the ceiling bar and vendor links, both modes', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('#hpe-config-card')).toBeVisible();
+  await expect(page.locator('.config-budget')).toContainText('must land under');
+  await expect(page.locator('#hpe-config-card .src-pill').first()).toBeVisible();
+  await expect(page.locator('#hpe-config-card')).toContainText('not an orderable BOM');
+  // Meeting answer carries it too.
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="0"]').click();
+  await page.locator('button.primary[data-goto="meeting-answer"]').click();
+  await expect(page.locator('#hpe-config-card')).toBeVisible();
+});
