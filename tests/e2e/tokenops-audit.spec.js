@@ -393,11 +393,22 @@ test('navigation: no view is a dead end (Fred: trapped)', async ({ page }) => {
   await expect(page.locator('.a-section').first()).toBeVisible();
   await page.locator('.app-nav .nav-item', { hasText: 'Starting point' }).click();
   await expect(page.locator('h1')).toContainText('Calloway Reed');
-  // Start over resets state and returns to start.
+  // Poison a rate cell and carry a section hash, then Start over must clean BOTH (Fred's catch).
+  await page.locator('.app-nav .nav-item', { hasText: 'Every dial' }).click();
+  await page.evaluate(() => {
+    location.hash = '#sec-topology';
+    const r = document.querySelector('input[data-rate="0"][data-ratefield="inputPerMillion"]');
+    r.value = '77'; r.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
   await page.locator('.nav-reset').click();
   await expect(page.locator('.start h1')).toContainText('What are you building?');
   const s = await page.evaluate(() => window.__tokenops.getState());
   expect(s.users).toBe(200); // defaults restored
+  const clean = await page.evaluate(() => ({ hash: location.hash, rate: window.__tokenops.compute().cmp.rows.find((r) => r.providerKey === 'anthropic').monthlyCost }));
+  expect(clean.hash).toBe('');
+  // Anthropic priced on pristine rates again (edited 77/MTok would inflate it hugely).
+  expect(clean.rate).toBeLessThan(3000);
   // Legacy chooser is retired: any old goto lands on start, never a trap.
   await page.evaluate(() => { window.__tokenops._test.reset(); });
   await expect(page.locator('.start h1')).toBeVisible();

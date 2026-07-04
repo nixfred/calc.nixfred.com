@@ -156,6 +156,7 @@ export function createSizer(root, summaryEl) {
     const b = e.target.closest('button');
     if (b?.dataset.nsReset) {
       state = structuredClone(SIZER_DEFAULTS);
+      history.replaceState(null, '', location.pathname);
       render();
       window.scrollTo(0, 0);
       return;

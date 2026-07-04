@@ -40,6 +40,10 @@ function setPath(obj, path, value) {
 
 export function createApp(root, data) {
   const { rates, hardware, sources, rules, providerMeta } = data;
+  // Pristine copy so Start over can truly reset EVERYTHING, including
+  // user-edited rate cells (Fred's catch: rates survived the reset).
+  const pristineRates = structuredClone(rates);
+  function resetRates() { rates.splice(0, rates.length, ...structuredClone(pristineRates)); }
   let state = structuredClone(data.defaults);
   let weightOverrides = {};
   let view = 'start';
@@ -459,6 +463,8 @@ export function createApp(root, data) {
     if (b.dataset.navReset) {
       state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null;
       startSel = { pattern: null, scale: 'department', data: 'yes' };
+      resetRates();
+      history.replaceState(null, '', location.pathname); // drop stale #sec-... anchors
       X.persistence.autosave(state, weightOverrides);
       view = 'start'; meetingStep = 0; render(); window.scrollTo(0, 0); return;
     }
@@ -524,7 +530,7 @@ export function createApp(root, data) {
       X.persistence.save(name, state, weightOverrides); render();
     }
     if (kind === 'wipe') {
-      if (confirm('Clear autosave and all locally saved scenarios on this browser?')) { X.persistence.clearAll(); state = structuredClone(data.defaults); weightOverrides = {}; render(); }
+      if (confirm('Clear autosave and all locally saved scenarios on this browser?')) { X.persistence.clearAll(); state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null; resetRates(); history.replaceState(null, '', location.pathname); render(); }
     }
   }
 
@@ -565,7 +571,7 @@ export function createApp(root, data) {
       exportMath: () => X.detailedMathMarkdown(exportContext().ctx),
       exportJson: () => X.scenarioJson(state, weightOverrides, VERSION),
       shareLink: () => X.shareLink(state, weightOverrides),
-      reset: () => { state = structuredClone(data.defaults); weightOverrides = {}; render(); },
+      reset: () => { state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null; resetRates(); render(); },
     },
   };
 }
