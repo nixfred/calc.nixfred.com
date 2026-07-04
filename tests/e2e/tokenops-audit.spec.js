@@ -434,3 +434,19 @@ test('example Customer landings carry the HPE configuration too', async ({ page 
   await expect(page.locator('#hpe-config-card')).toBeVisible();
   await expect(page.locator('.config-budget')).toContainText('must land under');
 });
+
+test('teach layer: (i) opens the glowing popover with all four sections, closes on Escape', async ({ page }) => {
+  await open(page);
+  const btnCount = await page.locator('.info-btn').count();
+  expect(btnCount).toBeGreaterThan(50); // every advanced input carries a teacher
+  await page.locator('.info-btn[data-teach="cachedInputPercent"]').click();
+  const pop = page.locator('.teach-pop');
+  await expect(pop).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'what this is' })).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'why it is an input' })).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'the math it drives' })).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'go deeper' })).toBeVisible();
+  await expect(pop.locator('.teach-links a').first()).toHaveAttribute('href', /^https:\/\//);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#teach-overlay')).toHaveCount(0);
+});
