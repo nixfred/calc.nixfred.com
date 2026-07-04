@@ -94,13 +94,21 @@ export function createSizer(root, summaryEl) {
       <div class="card"><h3 class="card-title">Next action</h3>
         <ol>${next.map((l) => `<li>${esc(l)}</li>`).join('')}</ol>
       </div>
-      <h2 class="a-title">Every formula</h2>
+      <h2 class="a-title" id="ns-formulas">Every formula</h2>
       ${order.map((id) => formulaTrace(traces[id], SIZER_SOURCES)).join('')}`;
   }
 
   function render() {
     root.innerHTML = `
-      <section class="a-section"><h2 class="a-title">The estate</h2>
+      <nav class="app-nav mono" aria-label="Calculator navigation">
+        <a class="nav-item" href="#ns-estate">The estate</a>
+        <a class="nav-item" href="#ns-results">The answer</a>
+        <a class="nav-item" href="#ns-formulas">Every formula</a>
+        <a class="nav-item" href="/howto/nutanix-sizer">Manual</a>
+        <a class="nav-item" href="/">All calculators</a>
+        <button type="button" class="nav-item nav-reset" data-ns-reset="1" title="Wipe inputs and begin fresh">Start over</button>
+      </nav>
+      <section class="a-section" id="ns-estate"><h2 class="a-title">The estate</h2>
         <p class="dim">Rough conversation sizing from the public NutaNIX field guide, appendix F. Ranges on purpose. Not a quote, not formal sizing.</p>
         <div id="ns-inputs">${inputsHtml()}</div>
       </section>
@@ -138,6 +146,12 @@ export function createSizer(root, summaryEl) {
 
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button');
+    if (b?.dataset.nsReset) {
+      state = structuredClone(SIZER_DEFAULTS);
+      render();
+      window.scrollTo(0, 0);
+      return;
+    }
     if (b?.dataset.copy !== undefined && b?.dataset.copy !== null) {
       navigator.clipboard.writeText(b.dataset.copy).then(() => { const t = b.textContent; b.textContent = 'copied'; setTimeout(() => (b.textContent = t), 1200); });
     }

@@ -37,3 +37,19 @@ test('database preset applies the 2:1 field ratio', async ({ page }) => {
   expect(s.vcpuToPcpu).toBe(2);
   expect(s.cvmProfile).toBe('heavy');
 });
+
+test('sizer navigation: anchors plus a real Start over (same treatment as TokenOps)', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await expect(page.locator('.app-nav')).toBeVisible();
+  for (const id of ['ns-estate', 'ns-results', 'ns-formulas']) {
+    expect(await page.locator(`#${id}`).count()).toBe(1);
+  }
+  await expect(page.locator('.app-nav a[href="/howto/nutanix-sizer"]')).toBeVisible();
+  await expect(page.locator('.app-nav a[href="/"]')).toBeVisible();
+  // Start over wipes edits.
+  await page.fill('input[data-ns="vmCount"]', '999');
+  await page.waitForTimeout(300);
+  await page.locator('.nav-reset').click();
+  const s = await page.evaluate(() => window.__sizer.getState());
+  expect(s.vmCount).toBe(200);
+});
