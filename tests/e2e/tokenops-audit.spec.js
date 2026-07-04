@@ -179,10 +179,10 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
     await expect(page.locator('#tokenops-summary')).toContainText('Do not size yet').catch(() => {});
   });
 
-  test('decode animation settles to real text (no permanently scrambled headings)', async ({ page }) => {
+  test('front door heading renders clean text (scramble is banned inside the calculator)', async ({ page }) => {
     await page.goto('/tokenops/');
-    await page.waitForTimeout(1500);
-    await expect(page.locator('.chooser h1')).toHaveText('TokenOps');
+    await page.waitForTimeout(1200);
+    await expect(page.locator('.start h1')).toHaveText('What are you building?');
   });
 
   test('45.11 model size quick pick offers the spec rows', async ({ page }) => {
@@ -344,4 +344,37 @@ test('decision card: verdict banner flips as the quote slider moves (Fred ROI as
     return out;
   });
   expect(verdicts).toEqual(['buy', 'negotiate', 'tokens']);
+});
+
+test('20c: presets are the front door - pattern wizard routes to a landing with assumptions', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await expect(page.locator('.start h1')).toContainText('What are you building?');
+  expect(await page.locator('.pattern-card').count()).toBeGreaterThanOrEqual(8);
+  await page.locator('.pattern-card[data-pattern="knowledge-rag"]').click();
+  await page.selectOption('#start-scale', 'department');
+  await page.selectOption('#start-data', 'with-controls');
+  await page.locator('#start-go').click();
+  await expect(page.locator('h1')).toContainText('Internal knowledge assistant');
+  await expect(page.locator('.card-title', { hasText: 'What we just assumed' })).toBeVisible();
+  expect(await page.locator('.verify-flag').count()).toBeGreaterThanOrEqual(3);
+  const s = await page.evaluate(() => window.__tokenops.getState());
+  expect(s.users).toBe(240);
+  expect(s.dataCanLeave).toBe('with-controls');
+  expect(s.ragEnabled).toBe(true);
+  await page.locator('button[data-goto="meeting-answer"]').click();
+  await expect(page.locator('.rec-headline').first()).toBeVisible();
+});
+
+test('20c: example Customers load as flagship presets with variable teaching notes', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await expect(page.locator('.persona-card')).toHaveCount(3);
+  await page.locator('.persona-card[data-persona="0"]').click();
+  await expect(page.locator('h1')).toContainText('Calloway Reed');
+  await expect(page.locator('.landing-story')).toContainText('240 attorney');
+  await expect(page.locator('th', { hasText: 'what it drives' })).toBeVisible();
+  const s = await page.evaluate(() => window.__tokenops.getState());
+  expect(s.users).toBe(240);
+  expect(s.chunksRetrievedPerQuery).toBe(8);
+  await page.locator('button[data-goto="meeting-answer"]').click();
+  await expect(page.locator('#inputs-recap')).toBeVisible();
 });

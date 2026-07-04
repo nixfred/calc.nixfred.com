@@ -9,6 +9,8 @@ import { recommend, confidence, discoveryQuestions, privatePolicyScore } from '.
 import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LABELS } from './sections.js';
 import * as C from './components.js';
 import * as X from './exports.js';
+import PRESETS_REG from '../../data/tokenops/presets.json';
+import EXAMPLE_CUSTOMERS from '../../data/tokenops/example-customers.json';
 
 export const VERSION = 'v1.0.0';
 
@@ -39,8 +41,55 @@ export function createApp(root, data) {
   const { rates, hardware, sources, rules, providerMeta } = data;
   let state = structuredClone(data.defaults);
   let weightOverrides = {};
-  let view = 'chooser';
+  let view = 'start';
   let meetingStep = 0;
+  let startSel = { pattern: null, scale: 'department', data: 'yes' };
+  let landingMeta = null;
+
+  function deepMergeState(base, patch) {
+    const out = { ...base, ...patch };
+    if (patch.roles) {
+      out.roles = structuredClone(base.roles);
+      for (const [role, cfg] of Object.entries(patch.roles)) out.roles[role] = { ...out.roles[role], ...cfg };
+    }
+    return out;
+  }
+
+  function applyPatternFlow() {
+    const pat = PRESETS_REG.patterns[startSel.pattern];
+    const band = PRESETS_REG.scaleBands[startSel.scale];
+    let next = deepMergeState(structuredClone(data.defaults), pat.patch);
+    if (band.users !== undefined && pat.patch.wlModernAgent !== false) next.users = band.users;
+    if (band.runsPerUserPerDay !== undefined) next.runsPerUserPerDay = band.runsPerUserPerDay;
+    if (startSel.pattern === 'coding-assistant' && band.users) { next.developers = Math.round(band.users * 0.75); next.acDevelopers = Math.max(2, Math.round(band.users * 0.25)); }
+    next.dataCanLeave = startSel.data;
+    if (startSel.data === 'no') { next.requiresOnPrem = false; next.permitsPublicCloud = false; next.promptsCanLeave = 'no'; next.docsCanLeave = 'no'; }
+    if (startSel.data === 'with-controls') { next.promptsCanLeave = 'yes'; next.docsCanLeave = 'yes'; }
+    next.scenarioName = pat.label;
+    state = next;
+    landingMeta = {
+      title: pat.label, tagline: pat.tagline, howCommon: pat.howCommon,
+      assumptions: pat.assumptions,
+      wizard: `${pat.label} + ${band.label} + data ${startSel.data}`,
+    };
+    view = 'landing';
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function applyPersonaFlow(idx) {
+    const p = EXAMPLE_CUSTOMERS[idx];
+    state = deepMergeState(structuredClone(data.defaults), p.inputs);
+    state.scenarioName = `${p.companyName} (${p.tier} example)`;
+    landingMeta = {
+      title: p.companyName, story: p.story, groundedIn: p.groundedIn,
+      assumptions: (p.variableNotes ?? []).slice(0, 6).map((n) => ({ label: `${n.variable} = ${n.value}`, why: n.meaning, verify: true })),
+      variableNotes: p.variableNotes,
+    };
+    view = 'landing';
+    render();
+    window.scrollTo(0, 0);
+  }
   let recomputeTimer = null;
 
   const shared = X.parseShareLink();
@@ -292,6 +341,8 @@ export function createApp(root, data) {
   }
 
   function render() {
+    if (view === 'start') { root.innerHTML = C.startScreen(PRESETS_REG, EXAMPLE_CUSTOMERS, startSel); decodeIn(root); updateSummaryBar(); return; }
+    if (view === 'landing' && landingMeta) { root.innerHTML = C.landingPanel(landingMeta, PRESETS_REG); decodeIn(root); updateSummaryBar(); return; }
     if (view === 'chooser') renderChooser();
     else if (view === 'meeting') renderMeeting();
     else renderArchitect();
@@ -301,7 +352,7 @@ export function createApp(root, data) {
   function updateSummaryBar() {
     const bar = document.getElementById('tokenops-summary');
     if (!bar) return;
-    if (view === 'chooser') { bar.classList.add('hidden'); return; }
+    if (view === 'chooser' || view === 'start') { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
     const cx = compute();
     bar.innerHTML = C.summaryBar({
@@ -375,6 +426,8 @@ export function createApp(root, data) {
       if (t.dataset.field === 'modelSizeQuickPick' && t.value) state.modelParamsB = Number(t.value);
       if (view === 'architect') render(); else debouncedRefresh();
     }
+    if (t.id === 'start-scale') { startSel.scale = t.value; return; }
+    if (t.id === 'start-data') { startSel.data = t.value; return; }
     if (t.id === 'preset-select' && t.value) {
       const p = WORKLOAD_PRESETS[t.value];
       state = { ...structuredClone(data.defaults), ...p.patch, scenarioName: p.label };
@@ -395,6 +448,10 @@ export function createApp(root, data) {
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.pattern !== undefined) { startSel.pattern = b.dataset.pattern; render(); return; }
+    if (b.dataset.persona !== undefined) { applyPersonaFlow(Number(b.dataset.persona)); return; }
+    if (b.id === 'start-go') { applyPatternFlow(); return; }
+    if (b.dataset.goto === 'meeting-answer') { view = 'meeting'; meetingStep = MEETING_STEPS.length; render(); window.scrollTo(0, 0); return; }
     if (b.dataset.goto) { view = b.dataset.goto; meetingStep = 0; render(); window.scrollTo(0, 0); return; }
     if (b.dataset.wiz === 'next') { meetingStep++; renderMeeting(); updateSummaryBar(); window.scrollTo(0, 0); return; }
     if (b.dataset.wiz === 'back') { meetingStep = Math.max(0, meetingStep - 1); renderMeeting(); updateSummaryBar(); window.scrollTo(0, 0); return; }
