@@ -241,3 +241,24 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .v-bad { color: #f0a3a3; }
 .finance-sliders { margin: 0.8rem 0 0.3rem; }
 .finance-sliders .slider-row { grid-template-columns: 9rem 1fr 8rem; }
+
+/* ---------- preset-driven front door (amendment 20c) ---------- */
+.start { max-width: 62rem; margin: 0 auto; text-align: center; padding: 2rem 0; }
+.start h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); margin-bottom: 0.4rem; }
+.pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 0.9rem; margin: 1.8rem 0 1.4rem; text-align: left; }
+.pattern-card { display: flex; flex-direction: column; gap: 0.35rem; background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; cursor: pointer; font: inherit; color: var(--text); transition: border-color 140ms ease, transform 140ms ease; }
+.pattern-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+.pattern-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pc-label { font-weight: 650; }
+.pc-tag { font-size: 0.8rem; }
+.pc-common { font-size: 0.62rem; color: var(--accent); letter-spacing: 0.04em; }
+.pc-tier { font-size: 0.62rem; color: var(--accent); letter-spacing: 0.1em; }
+.start-follow { display: flex; gap: 1rem; justify-content: center; align-items: flex-end; flex-wrap: wrap; margin: 1rem 0; text-align: left; }
+.start-follow .field { min-width: 16rem; }
+.persona-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.9rem; text-align: left; max-width: 52rem; margin: 0.8rem auto 0; }
+.persona-card { display: flex; flex-direction: column; gap: 0.3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; cursor: pointer; font: inherit; color: var(--text); }
+.persona-card:hover { border-color: var(--accent); }
+.start-skip { margin-top: 2rem; }
+.landing-story { color: var(--muted); font-size: 1.02rem; max-width: 46rem; }
+.verify-flag { font-size: 0.6rem; color: #e8c98a; border: 1px solid #6b5a2e; border-radius: 4px; padding: 0.1rem 0.35rem; letter-spacing: 0.08em; }
+.verify-row td { background: rgba(255, 190, 80, 0.04); }

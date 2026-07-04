@@ -93,6 +93,82 @@ export function recommendationCard(rec, conf, sources = []) {
   </div>`;
 }
 
+/* Preset-driven front door (spec amendment 20c): patterns are the entry,
+   grounded in verified deployment research, with example Customers as
+   flagship starting points. */
+export function startScreen(presets, personas, sel) {
+  const patternCards = Object.entries(presets.patterns).map(([k, p]) => `
+    <button type="button" class="pattern-card ${sel.pattern === k ? 'on' : ''}" data-pattern="${esc(k)}">
+      <span class="pc-label">${esc(p.label)}</span>
+      <span class="pc-tag dim">${esc(p.tagline)}</span>
+      <span class="pc-common mono">${esc(p.howCommon.split(';')[0].split('(')[0].trim())}</span>
+    </button>`).join('');
+  const personaCards = personas.map((p, i) => `
+    <button type="button" class="persona-card" data-persona="${i}">
+      <span class="pc-tier mono">${esc(p.tier.toUpperCase())}</span>
+      <span class="pc-label">${esc(p.companyName)}</span>
+      <span class="pc-tag dim">${esc(p.industry)}</span>
+    </button>`).join('');
+  const followups = sel.pattern ? `
+    <div class="start-follow">
+      <div class="field"><label>Who touches it, at what scale?</label>
+        <select id="start-scale">${Object.entries(presets.scaleBands).map(([k, b]) => `<option value="${k}" ${sel.scale === k ? 'selected' : ''}>${esc(b.label)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Can the data leave your environment?</label>
+        <select id="start-data">
+          <option value="yes" ${sel.data === 'yes' ? 'selected' : ''}>Yes</option>
+          <option value="with-controls" ${sel.data === 'with-controls' ? 'selected' : ''}>Only with controls</option>
+          <option value="no" ${sel.data === 'no' ? 'selected' : ''}>No, it stays inside</option>
+        </select>
+      </div>
+      <button class="primary" id="start-go">Build my starting point</button>
+    </div>` : '<p class="dim">Pick what you are building and two more questions finish the routing.</p>';
+  return `
+    <div class="start">
+      <h1>What are you building?</h1>
+      <p class="dim">Every session starts from a real-world pattern. Grounded in 2025-2026 production deployment research, every assumption shown and adjustable.</p>
+      <div class="pattern-grid">${patternCards}</div>
+      ${followups}
+      <p class="section-label" style="margin-top:2.2rem">or walk in an example Customer's shoes</p>
+      <div class="persona-row">${personaCards}</div>
+      <p class="dim start-skip">Prefer a blank sheet? <button class="linklike" data-goto="meeting">Meeting Mode</button> &middot; <button class="linklike" data-goto="architect">Architect Mode</button></p>
+    </div>`;
+}
+
+export function landingPanel(meta, presets) {
+  const rows = (meta.assumptions ?? []).map((a) => `
+    <tr class="${a.verify ? 'verify-row' : ''}">
+      <td>${a.verify ? '<span class="verify-flag mono">VERIFY</span>' : ''}</td>
+      <td><b>${esc(a.label)}</b><br><span class="dim">${esc(a.why)}</span></td>
+      <td><button class="linklike" data-goto="architect">adjust</button></td>
+    </tr>`).join('');
+  const notes = meta.variableNotes?.length ? `
+    <details class="weight-group" open><summary>Every number, explained: what it means and what it drives</summary>
+      <div class="table-wrap"><table class="cmp-table"><thead><tr><th>variable</th><th>value</th><th>what it means here</th><th>what it drives</th></tr></thead><tbody>
+        ${meta.variableNotes.map((n) => `<tr><td class="mono">${esc(n.variable)}</td><td class="mono num">${esc(n.value)}</td><td>${esc(n.meaning)}</td><td>${esc(n.drives)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </details>` : '';
+  return `
+    <div class="wizard" style="max-width: 52rem;">
+      <h1>${esc(meta.title)}</h1>
+      ${meta.story ? `<p class="landing-story">${esc(meta.story)}</p>` : `<p class="dim">${esc(meta.tagline ?? '')}</p>`}
+      ${meta.howCommon ? `<p class="dim"><span class="k">how common</span> ${esc(meta.howCommon)}</p>` : ''}
+      ${meta.groundedIn ? `<p class="dim"><span class="k">grounded in</span> ${esc(meta.groundedIn)}</p>` : ''}
+      <div class="card">
+        <h3 class="card-title">What we just assumed for you</h3>
+        <p class="dim">Starting points, not truths. The flagged rows are the ones to verify with the Customer before anyone quotes anything.</p>
+        <div class="table-wrap"><table class="cmp-table"><tbody>${rows}</tbody></table></div>
+        ${meta.wizard ? `<p class="dim mono" style="font-size:0.75rem">routed by: ${esc(meta.wizard)}</p>` : ''}
+      </div>
+      ${notes}
+      <div class="btn-row">
+        <button class="primary" data-goto="meeting-answer">See the answer</button>
+        <button data-goto="architect">Open every dial</button>
+        <button data-goto="start">Start over</button>
+      </div>
+    </div>`;
+}
+
 /* Meeting Mode answer page: relist everything entered in the wizard so the
    report is self-contained (Fred's ask, 2026-07-03). */
 export function inputsRecapCard(state) {

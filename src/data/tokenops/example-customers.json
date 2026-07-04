@@ -1,0 +1,423 @@
+[
+  {
+    "tier": "small",
+    "companyName": "Calloway Reed LLP",
+    "industry": "Legal services (regional litigation and transactional firm)",
+    "story": "Calloway Reed is a 240 attorney regional firm that built a single RAG assistant over 50 years of opinions, briefs, and internal memoranda after two partners saw a competitor demo one. The stack is deliberately boring: one retrieval pipeline, one generation model, hybrid search reranked down to 8 chunks, no agents, no tools. Adoption surprised everyone, 78 percent of the partnership is weekly active at month six and the associates average about 5 queries a day, so the bill that started as a rounding error is now a line item the COO asks about. They are firmly in API territory and the conversation is about cache discipline and chunk budgets, not GPUs.",
+    "inputs": {
+      "users": 240,
+      "runsPerUserPerDay": 5,
+      "adoptionPercent": 78,
+      "activeDaysPerMonth": 21,
+      "usagePattern": "bursty",
+      "plannerCalls": 0,
+      "workerAgents": 1,
+      "workerCallsPerAgent": 1,
+      "judgeCalls": 0,
+      "summarizerCalls": 0,
+      "roles": {
+        "planner": {
+          "inputTokensPerCall": 0,
+          "outputTokensPerCall": 0
+        },
+        "worker": {
+          "inputTokensPerCall": 7000,
+          "outputTokensPerCall": 450
+        },
+        "judge": {
+          "inputTokensPerCall": 0,
+          "outputTokensPerCall": 0
+        },
+        "summarizer": {
+          "inputTokensPerCall": 0,
+          "outputTokensPerCall": 0
+        }
+      },
+      "cachedInputPercent": 40,
+      "retryRatePercent": 3,
+      "ragEnabled": true,
+      "chunksRetrievedPerQuery": 8,
+      "avgTokensPerChunk": 550,
+      "documentsIndexed": 600000,
+      "toolUseEnabled": false,
+      "toolCallsPerRun": 0,
+      "avgToolResultTokens": 0,
+      "toolsExposed": 0,
+      "dataCanLeave": "yes",
+      "regulatedData": false,
+      "residencyRequired": false,
+      "dataSensitivity": "medium",
+      "needGovernance": 1,
+      "needQuality": 2,
+      "needEnterpriseRetrieval": 2,
+      "needLowOps": 3,
+      "needTimeToValue": 3,
+      "needModelRouting": 0,
+      "needDataGravity": 0
+    },
+    "variableNotes": [
+      {
+        "variable": "users",
+        "value": "240",
+        "meaning": "Every attorney and paralegal with a license to the assistant, the whole firm roster.",
+        "drives": "The base of the whole volume pyramid. Everything downstream is users times adoption times runs, so headcount is the first thing to pressure test in discovery."
+      },
+      {
+        "variable": "adoptionPercent",
+        "value": "78",
+        "meaning": "Weekly active share of licensed users at month six, straight from what a well run legal pilot actually achieves.",
+        "drives": "Most Customers guess 100 and overbuy. Real adoption between 60 and 80 percent cuts modeled monthly tokens by a fifth to a third, which is the difference between a comfortable budget and an awkward renewal call."
+      },
+      {
+        "variable": "runsPerUserPerDay",
+        "value": "5",
+        "meaning": "Queries per active user per working day, matching the measured frequency of a sticky internal assistant.",
+        "drives": "Linear multiplier on monthly tokens. If associates start treating it like search this doubles, and the bill doubles with it. This is the variable to instrument first."
+      },
+      {
+        "variable": "roles.worker.inputTokensPerCall",
+        "value": "7000",
+        "meaning": "One generation call: roughly 1,200 tokens of system prompt and citation rules, 4,400 tokens of retrieved chunks, and the question plus short history.",
+        "drives": "Input tokens dominate RAG economics because input is 15x the output volume here. Every extra chunk or fatter system prompt lands directly on the provider bill."
+      },
+      {
+        "variable": "roles.worker.outputTokensPerCall",
+        "value": "450",
+        "meaning": "A grounded answer with forced citations, slightly longer than a generic chatbot reply because legal answers must cite.",
+        "drives": "Output is priced 4 to 5x input per token, so even at 450 tokens it is a third of the per query cost. Verbose answer styles are a silent budget leak."
+      },
+      {
+        "variable": "chunksRetrievedPerQuery",
+        "value": "8",
+        "meaning": "Hybrid retrieval pulls about 30 candidates, a reranker narrows to the top 8 that reach the model.",
+        "drives": "The single biggest lever in this account. The reference deployments that moved k from 3 to 8 saw cost grow faster than usage. Going to 12 chunks here adds 2,200 input tokens per query, about 30 percent on the bill, for marginal quality."
+      },
+      {
+        "variable": "avgTokensPerChunk",
+        "value": "550",
+        "meaning": "Structure aware chunks of 500 to 900 tokens tuned for legal documents, averaging near the low end.",
+        "drives": "Multiplies against chunk count to set retrieved context size. It also sets vector count for the index, so it moves both the token bill and the vector database tier."
+      },
+      {
+        "variable": "documentsIndexed",
+        "value": "600000",
+        "meaning": "Fifty years of opinions, briefs, and memoranda in the corpus.",
+        "drives": "Drives embedding cost, re embed cost on model changes, and vector storage. Query time embedding is pennies, but a full annual re embed of a corpus this size is a real four figure event worth planning."
+      },
+      {
+        "variable": "cachedInputPercent",
+        "value": "40",
+        "meaning": "Only the system prompt prefix caches. Retrieved chunks change every query, so most input tokens miss cache.",
+        "drives": "Sits exactly at the threshold practitioners call a problem. Restructuring the prompt so the static prefix caches cleanly is the cheapest optimization on the table, real deployments went from single digits to 84 percent hit rates on prefix fixes alone."
+      },
+      {
+        "variable": "topology (single worker)",
+        "value": "1 agent, 1 call",
+        "meaning": "No planner, no judge, no summarizer. One retrieval, one generation, done.",
+        "drives": "Keeps cost per query at one call instead of ten. When the Customer asks for an agentic upgrade, show them this number first, every added role multiplies the run cost."
+      },
+      {
+        "variable": "retryRatePercent",
+        "value": "3",
+        "meaning": "Occasional regeneration when the citation checker rejects an answer.",
+        "drives": "Small here, but it compounds silently. At 3 percent it adds 3 percent to everything. On agent stacks it becomes a first order cost, so it is worth watching from day one."
+      },
+      {
+        "variable": "dataCanLeave",
+        "value": "yes",
+        "meaning": "Attorney work product goes to a commercial API under a DPA and zero retention terms the firm accepted.",
+        "drives": "This keeps the whole route on managed APIs, which is right at 150M tokens a month. No hardware conversation exists at this tier, and forcing one would be malpractice."
+      }
+    ],
+    "groundedIn": "Numbers echo the anonymized legal research firm case (78% partner weekly active adoption, hybrid retrieval 30 candidates reranked to top 8, 500-900 token chunks), Glean's measured ~5 queries/user/day and 40% DAU/MAU stickiness, the swfte RAG reference scenario (~7-8K input / ~400 output tokens per query), and the Kalvium Labs departmental client (k moving 3 to 8, 500 token chunks, cost outrunning usage growth, low hundreds of dollars per month scale). The 40% cache hit teaching point comes from ProjectDiscovery's documented 4-7% to 84% cache journey and its 'below 40% signals a problem' threshold."
+  },
+  {
+    "tier": "medium",
+    "companyName": "Harborline Mutual",
+    "industry": "Health benefits administration and insurance (regulated claims and prior authorization)",
+    "story": "Harborline is a third party administrator processing claims and prior authorization for regional health plans, about 800 examiners and nurses on the platform. They rebuilt intake as a multi agent pipeline: a planner decomposes each case, three workers handle document extraction, plan document RAG, and fraud plus compliance checks, a judge reviews every determination before a human sees it, and a summarizer drafts the determination letter. PHI means data leaves only under a BAA with residency pinned and full audit logging, so the route conversation is dedicated capacity and VPC endpoints, not raw public API. Volume is around 6,000 agent runs a day and the judge layer exists because their first guardrail design doubled latency and burned tokens until they split cheap checks from expensive ones. Their spend sits right in the band surveys report for firms this size, and the CFO wants the router tuned before renewal.",
+    "inputs": {
+      "users": 800,
+      "runsPerUserPerDay": 12,
+      "adoptionPercent": 65,
+      "activeDaysPerMonth": 22,
+      "usagePattern": "bursty",
+      "plannerCalls": 1,
+      "workerAgents": 3,
+      "workerCallsPerAgent": 3,
+      "judgeCalls": 1,
+      "summarizerCalls": 1,
+      "roles": {
+        "planner": {
+          "inputTokensPerCall": 3000,
+          "outputTokensPerCall": 300
+        },
+        "worker": {
+          "inputTokensPerCall": 6500,
+          "outputTokensPerCall": 500
+        },
+        "judge": {
+          "inputTokensPerCall": 3500,
+          "outputTokensPerCall": 200
+        },
+        "summarizer": {
+          "inputTokensPerCall": 5000,
+          "outputTokensPerCall": 600
+        }
+      },
+      "cachedInputPercent": 75,
+      "retryRatePercent": 7,
+      "ragEnabled": true,
+      "chunksRetrievedPerQuery": 10,
+      "avgTokensPerChunk": 450,
+      "documentsIndexed": 1500000,
+      "toolUseEnabled": true,
+      "toolCallsPerRun": 14,
+      "avgToolResultTokens": 650,
+      "toolsExposed": 22,
+      "dataCanLeave": "with-controls",
+      "regulatedData": true,
+      "residencyRequired": true,
+      "dataSensitivity": "high",
+      "needGovernance": 3,
+      "needQuality": 3,
+      "needEnterpriseRetrieval": 2,
+      "needIntegration": 3,
+      "needModelRouting": 2,
+      "needLowOps": 1,
+      "needDataGravity": 2
+    },
+    "variableNotes": [
+      {
+        "variable": "users",
+        "value": "800",
+        "meaning": "Claims examiners, prior auth nurses, and support staff whose casework flows through the agent pipeline.",
+        "drives": "With multi agent topology every user is worth 15 model calls per run, so 800 users here generate the token load of several thousand users on a simple assistant. Headcount times topology is the real sizing unit."
+      },
+      {
+        "variable": "runsPerUserPerDay",
+        "value": "12",
+        "meaning": "Cases touched per examiner per day, each case triggering one full pipeline run.",
+        "drives": "6,240 runs a day at 15 calls each is 94,000 model calls daily. This is the variable that turns a per seat mental model into a per workflow one, and it is where Customers usually underestimate by 2 to 3x."
+      },
+      {
+        "variable": "workerAgents",
+        "value": "3",
+        "meaning": "Document extraction, plan document retrieval, and fraud plus compliance checks, each a specialized agent.",
+        "drives": "Each added worker multiplies calls per run by its call count. Going from 3 to 4 workers adds roughly 20 percent to the entire bill overnight. Topology decisions are budget decisions."
+      },
+      {
+        "variable": "workerCallsPerAgent",
+        "value": "3",
+        "meaning": "Each worker iterates about three times per case, read, act, verify, consistent with measured agent step counts on real multi step tasks.",
+        "drives": "Multiplies against worker count for 9 worker calls per run carrying the fattest context. Weaker models need more iterations for the same task, so downgrading the worker model can raise call counts and eat the savings."
+      },
+      {
+        "variable": "roles.worker.inputTokensPerCall",
+        "value": "6500",
+        "meaning": "System prompt, tool schemas for its slice of the 22 exposed tools, retrieved plan document chunks, and accumulated case state.",
+        "drives": "Nine of these per run makes worker input 80 percent of all tokens. Every schema added to the worker prefix and every chunk added to retrieval lands here 9 times per case."
+      },
+      {
+        "variable": "judgeCalls",
+        "value": "1",
+        "meaning": "A guardrail judge reviews every determination for compliance before a human or member sees it, the pattern that cut severe compliance issues 99 percent at a reference deployment.",
+        "drives": "Costs 3,700 tokens per run but is non negotiable with regulated data. The lesson for the Customer is to run the judge on a cheap fast model, the reference case burned tokens until they two tiered exactly this check."
+      },
+      {
+        "variable": "toolCallsPerRun",
+        "value": "14",
+        "meaning": "Eligibility lookups, prior claim pulls, provider registry checks, fraud scoring calls, in line with measured benchmark averages and the 18 automated checks a famous insurtech runs per claim.",
+        "drives": "14 calls at 650 tokens each injects 9,100 tokens of tool results per run into worker context. Tool result size is a stealth cost center, summarizing verbose results before they hit context is real money at this volume."
+      },
+      {
+        "variable": "toolsExposed",
+        "value": "22",
+        "meaning": "The full tool surface the agents can see, claims systems, registries, document stores.",
+        "drives": "Schema definitions ride in the prompt prefix of every worker call. Production agents have been measured carrying 50K plus tokens of tool definitions before reading the request. Keeping this list pruned protects both cache hit rate and per call input size."
+      },
+      {
+        "variable": "chunksRetrievedPerQuery",
+        "value": "10",
+        "meaning": "Plan documents, medical policy criteria, and prior determinations retrieved per case, 450 token chunks.",
+        "drives": "4,500 tokens of retrieved context repeated across worker calls. Because the RAG worker runs 3 times per case, retrieval depth here costs triple what it would in a single call assistant."
+      },
+      {
+        "variable": "cachedInputPercent",
+        "value": "75",
+        "meaning": "Big static prefixes, system prompts and tool schemas, cache well across the 94,000 daily calls. They fixed prefix ordering to get here.",
+        "drives": "The difference between 40 and 75 percent hit rate at this volume is thousands of dollars a month. The documented ceiling is around 84 percent, so there is one more optimization pass available before this lever is spent."
+      },
+      {
+        "variable": "retryRatePercent",
+        "value": "7",
+        "meaning": "Judge rejections and tool failures that force partial re runs of the pipeline.",
+        "drives": "On a 15 call topology a retry is not one extra call, it can replay a whole branch. 7 percent here quietly adds a low six figure annual line. Retry economics are why agent stacks punish sloppy error handling."
+      },
+      {
+        "variable": "dataCanLeave",
+        "value": "with-controls",
+        "meaning": "PHI leaves only under a BAA, via private endpoints, with residency pinned and field level logging, compliance designed into the architecture from day one.",
+        "drives": "This gates the route to controlled managed capacity or VPC deployment rather than cheapest public API, typically a 20 to 40 percent premium over list pricing. It also weights governance heavy platforms in the recommendation."
+      },
+      {
+        "variable": "regulatedData + residencyRequired",
+        "value": "true / true",
+        "meaning": "HIPAA scope plus a contractual requirement that member data stays in region.",
+        "drives": "Together these eliminate every route that cannot prove residency and audit trails, regardless of price. Policy gates are binary, no token math overrides them, which is exactly the lesson this persona teaches."
+      },
+      {
+        "variable": "usagePattern",
+        "value": "bursty",
+        "meaning": "Claims volume peaks Monday mornings and at enrollment deadlines, quiet nights and weekends.",
+        "drives": "Bursty plus controlled capacity means paying for peak. If they ever self host, peak to average ratio sets GPU count, so smoothing intake with a queue is worth real hardware dollars."
+      }
+    ],
+    "groundedIn": "Shape and numbers echo Lemonade's AI Jim (18 automated fraud and policy checks per claim), Anterior's prior authorization pipeline (orchestrated extraction and classification models in HIPAA scope), DoorDash's two tier guardrail judge (first design doubled latency and burned tokens, redesign cut severe compliance issues 99%), Decagon's mid market cases (Rippling, NG.CASH, thousands of tickets/day scale), MCPMark's measured 17.4 tool calls per agent task, Anthropic's documented 50K+ token tool definition overhead, ProjectDiscovery's 73.7-84.3% achievable cache hit rates on agent prefixes, Alpian Bank's compliance as architecture pattern, and the CloudZero survey band ($62-85K/month average enterprise LLM spend for 250-10,000 employee firms) which this persona's modeled ~10B tokens/month lands inside."
+  },
+  {
+    "tier": "large",
+    "companyName": "Northgale Communications",
+    "industry": "Telecommunications (national carrier, internal employee AI platform)",
+    "story": "Northgale runs Ask Northgale, an internal assistant platform serving 80,000 employees across care centers, field ops, and engineering, with 60 percent of the company active on it daily. The architecture is a router orchestrator delegating to four small specialized worker agents per run, a pattern they adopted after a monolithic frontier model design made the token curve unsustainable, and the platform now moves about 27 billion tokens a day at steady state. Customer proprietary network data means everything runs under controls, and at this volume the economics conversation stopped being about API discounts a year ago, it is now a GPU cluster sizing and hybrid routing conversation with a hard latency SLO. The account team lives in the gap between what the router sends to self hosted SLMs and what still justifies frontier API calls.",
+    "inputs": {
+      "users": 80000,
+      "runsPerUserPerDay": 8,
+      "adoptionPercent": 60,
+      "activeDaysPerMonth": 22,
+      "usagePattern": "steady",
+      "plannerCalls": 1,
+      "workerAgents": 4,
+      "workerCallsPerAgent": 3,
+      "judgeCalls": 1,
+      "summarizerCalls": 1,
+      "roles": {
+        "planner": {
+          "inputTokensPerCall": 2500,
+          "outputTokensPerCall": 200
+        },
+        "worker": {
+          "inputTokensPerCall": 4500,
+          "outputTokensPerCall": 400
+        },
+        "judge": {
+          "inputTokensPerCall": 3000,
+          "outputTokensPerCall": 150
+        },
+        "summarizer": {
+          "inputTokensPerCall": 6000,
+          "outputTokensPerCall": 500
+        }
+      },
+      "cachedInputPercent": 85,
+      "retryRatePercent": 4,
+      "ragEnabled": true,
+      "chunksRetrievedPerQuery": 6,
+      "avgTokensPerChunk": 500,
+      "documentsIndexed": 10000000,
+      "toolUseEnabled": true,
+      "toolCallsPerRun": 10,
+      "avgToolResultTokens": 600,
+      "toolsExposed": 45,
+      "dataCanLeave": "with-controls",
+      "regulatedData": true,
+      "residencyRequired": false,
+      "dataSensitivity": "high",
+      "needGovernance": 2,
+      "needQuality": 2,
+      "needModelRouting": 3,
+      "needDataGravity": 3,
+      "needInternalApis": 3,
+      "needLowOps": 0,
+      "needTimeToValue": 1,
+      "needEnterpriseRetrieval": 3
+    },
+    "variableNotes": [
+      {
+        "variable": "users",
+        "value": "80000",
+        "meaning": "Total employee base with platform access, care agents, field techs, engineers, back office.",
+        "drives": "At this base, single percentage point moves in any downstream variable are worth six figures annually. Nothing at this tier is a rounding error, which is why every other variable note here ends in dollars or GPUs."
+      },
+      {
+        "variable": "adoptionPercent",
+        "value": "60",
+        "meaning": "Company wide daily active share, matching the best measured real world figure for a mandated less, genuinely useful internal AI stack.",
+        "drives": "48,000 daily actives. The engineering department runs above 90 percent, care runs lower, and the blend sets total throughput. Growth to 75 percent adds a quarter to the cluster size, so adoption forecasting is capacity planning here."
+      },
+      {
+        "variable": "runsPerUserPerDay",
+        "value": "8",
+        "meaning": "Assistant sessions per active employee per day, between casual search like usage and heavy workflow embedding.",
+        "drives": "384,000 runs a day. Combined with topology this yields roughly 27 billion tokens daily, the exact scale at which a real carrier was forced off monolithic routing. This variable times topology is the whole story."
+      },
+      {
+        "variable": "workerAgents",
+        "value": "4",
+        "meaning": "Small specialized agents, knowledge retrieval, ticket actions, network data lookup, HR and policy, orchestrated per run instead of one frontier model doing everything.",
+        "drives": "This is the 90 percent cost cut pattern. Twelve worker calls per run go to small self hosted models at cents per million tokens while the planner stays frontier. Collapsing back to one big model would multiply spend by an order of magnitude."
+      },
+      {
+        "variable": "workerCallsPerAgent",
+        "value": "3",
+        "meaning": "Iterations per worker, kept tight because the orchestrator hands each worker a narrow, well specified task.",
+        "drives": "Worker calls are 80 percent of all tokens, so this multiplier directly sizes the GPU fleet. If task specs degrade and workers start iterating 5 times, the cluster needs to grow 60 percent with zero new user value."
+      },
+      {
+        "variable": "roles.planner.inputTokensPerCall",
+        "value": "2500",
+        "meaning": "The orchestrator sees a compact routing context, intent, user role, and a task state summary, never the full retrieved corpus.",
+        "drives": "Keeping the expensive frontier planner thin is deliberate. Every token added to planner context is priced at frontier rates 384,000 times a day, so planner context discipline is worth an engineer's salary per thousand tokens."
+      },
+      {
+        "variable": "cachedInputPercent",
+        "value": "85",
+        "meaning": "More than half of requests share prefixes on this platform, and the serving stack exploits it aggressively, matching the best documented production cache rates.",
+        "drives": "On the API routed share this cuts input cost up to 90 percent on hits. On the self hosted share it shows up as KV cache reuse, which raises effective throughput per GPU and shrinks the cluster. Same variable, two different hardware and billing consequences."
+      },
+      {
+        "variable": "toolsExposed",
+        "value": "45",
+        "meaning": "The full internal API surface, ticketing, provisioning, network telemetry, HR systems, curated per agent so no single worker sees all 45.",
+        "drives": "Uncurated, this is a 50K plus token schema tax on every call, a failure mode measured in production at 134K tokens. Per agent tool scoping is why worker input holds at 4,500 tokens, and it is the first thing to audit when input tokens drift up."
+      },
+      {
+        "variable": "chunksRetrievedPerQuery",
+        "value": "6",
+        "meaning": "Tight retrieval over a 10 million document knowledge base, tuned down because research shows quality degrades as assembled context grows.",
+        "drives": "At 384,000 runs a day each extra chunk is roughly 190 million input tokens daily. This platform proves the counterintuitive rule that bigger corpora justify tighter retrieval, precision beats volume at scale."
+      },
+      {
+        "variable": "documentsIndexed",
+        "value": "10000000",
+        "meaning": "Every KB article, runbook, plan document, and policy across the business units.",
+        "drives": "Corpus size drives embedding refresh cost, vector storage in the tens of TB with replication, and re embed events that are five figure line items. It also drives the retrieval infrastructure sizing independent of LLM tokens."
+      },
+      {
+        "variable": "usagePattern",
+        "value": "steady",
+        "meaning": "Care centers run around the clock across time zones, so load is flat rather than spiky.",
+        "drives": "Steady load is the strongest possible argument for owned hardware. Self hosting break even arrives around tens of millions of tokens a day and this platform runs a thousand times past that, flat utilization means GPUs bought are GPUs used, no idle peak capacity."
+      },
+      {
+        "variable": "dataCanLeave",
+        "value": "with-controls",
+        "meaning": "Customer proprietary network information and employee data flow under regulatory controls, contractual terms, and private connectivity.",
+        "drives": "Policy alone permits controlled API use, but combined with volume it tips the route to hybrid: self hosted SLM workers on owned GPUs for the bulk, controlled frontier API for the planner and hard cases. Economics and policy point the same direction here, which makes this the cleanest hardware conversation of the three tiers."
+      },
+      {
+        "variable": "retryRatePercent",
+        "value": "4",
+        "meaning": "Failed tool calls and judge rejections across a mature, well instrumented pipeline.",
+        "drives": "4 percent of 27 billion daily tokens is over a billion retry tokens a day. At this tier retry rate is not hygiene, it is a capacity line item that owns part of the GPU budget."
+      },
+      {
+        "variable": "needModelRouting",
+        "value": "3",
+        "meaning": "The platform lives or dies on sending each task to the cheapest model that can do it, the explicit strategy of every carrier scale deployment on record.",
+        "drives": "Weights the route recommendation toward gateway and router architectures and multi model serving stacks. The measured spread between model tiers on identical workloads runs 17x to 47x, so routing quality is the single biggest cost control at this scale."
+      }
+    ],
+    "groundedIn": "Directly modeled on AT&T's Ask AT&T re architecture (8B to 27B tokens/day on multi agent SLM orchestration with ~90% cost cut, 100K+ internal users; this persona's math lands at ~27B tokens/day), Cloudflare's internal AI stack (60% company wide / 93% R&D adoption, 241B tokens per 30 days through their gateway), Cisco's internal assistant (~90K employees, model router pattern to avoid burning frontier tokens on simple tasks), LinkedIn's vLLM platform (>50% prefix shared requests, p95 latency SLOs), ProjectDiscovery's 84.3% cache hit ceiling, Anthropic's 134K token tool definition overhead case, Chroma's context degradation research for tight retrieval, self hosting break even rules of thumb (tens of millions of tokens/day) from the 2026 cost analysis literature, and the CloudZero finding that 40% of firms now spend over $10M/year on AI."
+  }
+]

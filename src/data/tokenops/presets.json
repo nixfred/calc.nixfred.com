@@ -1,0 +1,173 @@
+{
+  "comment": "Preset-driven front door registry (spec amendment 20c). Patterns ranked and grounded in the 2025-2026 taxonomy research: Menlo Ventures enterprise AI census, a16z 100-CIO survey, LangChain State of Agent Engineering (n=1340), McKinsey State of AI, Anthropic Economic Index, DBTA RAG survey. Every default is an editable assumption; the landing panel makes them loud.",
+  "sources": {
+    "menlo": "https://menlovc.com/perspective/2025-the-state-of-generative-ai-in-the-enterprise/",
+    "a16z": "https://a16z.com/ai-enterprise-2025/",
+    "langchain": "https://www.langchain.com/state-of-agent-engineering",
+    "mckinsey": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai",
+    "anthropic_index": "https://www.anthropic.com/research/anthropic-economic-index-september-2025-report",
+    "dbta_rag": "https://www.dbta.com/Editorial/Trends-and-Applications/RESEARCH-at-DBTA-Survey-RAG-Emerges-as-the-Connective-Tissue-of-Enterprise-AI-167699.aspx"
+  },
+  "patterns": {
+    "knowledge-rag": {
+      "label": "Internal knowledge assistant (RAG)",
+      "tagline": "Chat over your documents for the whole team or org.",
+      "audience": "internal",
+      "howCommon": "Top-3 internal pattern; knowledge management is a leading AI function in McKinsey's survey and RAG is the number-two customization technique in Menlo's census.",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "single", "plannerCalls": 0, "routerCalls": 0, "workerAgents": 1, "workerCallsPerAgent": 1, "judgeCalls": 0, "criticCalls": 0, "summarizerCalls": 0,
+        "runsPerUserPerDay": 5, "adoptionPercent": 70, "activeDaysPerMonth": 21, "usagePattern": "bursty",
+        "ragEnabled": true, "ragCallsPerRun": 1, "chunksRetrievedPerQuery": 8, "avgTokensPerChunk": 550, "documentsIndexed": 100000,
+        "roles": { "worker": { "inputTokensPerCall": 7000, "outputTokensPerCall": 450 } },
+        "cachedInputPercent": 40, "retryRatePercent": 3, "toolUseEnabled": false,
+        "needEnterpriseRetrieval": 2, "needLowOps": 3, "needTimeToValue": 3, "needGovernance": 1
+      },
+      "assumptions": [
+        { "field": "runsPerUserPerDay", "label": "5 queries per active user per day", "why": "Glean-class internal assistants measure about 5 queries per user per day at healthy stickiness.", "verify": true },
+        { "field": "adoptionPercent", "label": "70 percent adoption", "why": "Well-run internal pilots land 60 to 80 percent weekly-active; nobody gets 100.", "verify": true },
+        { "field": "roles.worker.inputTokensPerCall", "label": "7,000 input tokens per query", "why": "System prompt plus 8 retrieved chunks at ~550 tokens plus the question. The RAG reference scenario shape.", "verify": true },
+        { "field": "chunksRetrievedPerQuery", "label": "8 chunks retrieved", "why": "Production deployments rerank ~30 candidates to a top 5-8. The single biggest cost lever in RAG.", "verify": true },
+        { "field": "cachedInputPercent", "label": "40 percent cache hits", "why": "Only the static prompt prefix caches; retrieved chunks miss. Below 40 signals a prompt-structure problem.", "verify": false },
+        { "field": "topologyType", "label": "Single assistant, no agents", "why": "Real knowledge assistants are chat-over-corpus, not agent crews. Only 16 percent of enterprise 'agents' are true agents (Menlo).", "verify": false }
+      ]
+    },
+    "support-automation": {
+      "label": "Customer support automation",
+      "tagline": "Deflect and resolve tickets with an assistant that escalates to humans.",
+      "audience": "external",
+      "howCommon": "The number-one primary agent use case in LangChain's survey (26.5 percent); over 90 percent of a16z's CIOs were testing support AI.",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "planner-worker", "plannerCalls": 1, "routerCalls": 1, "workerAgents": 1, "workerCallsPerAgent": 2, "judgeCalls": 0, "criticCalls": 0, "summarizerCalls": 1,
+        "users": 40, "runsPerUserPerDay": 0, "adoptionPercent": 100, "activeDaysPerMonth": 30, "usagePattern": "steady",
+        "customWorkloadMonthlyTokens": 0,
+        "ragEnabled": true, "ragCallsPerRun": 1, "chunksRetrievedPerQuery": 6, "avgTokensPerChunk": 450, "documentsIndexed": 20000,
+        "roles": { "planner": { "inputTokensPerCall": 1500, "outputTokensPerCall": 200 }, "worker": { "inputTokensPerCall": 5500, "outputTokensPerCall": 500 }, "summarizer": { "inputTokensPerCall": 1500, "outputTokensPerCall": 250 }, "router": { "inputTokensPerCall": 600, "outputTokensPerCall": 30 } },
+        "cachedInputPercent": 55, "retryRatePercent": 5, "toolUseEnabled": true, "toolsExposed": 5, "avgToolSchemaTokens": 300, "toolCallsPerRun": 2, "avgToolResultTokens": 500,
+        "humanApprovalRequired": true, "needTimeToValue": 2, "needGovernance": 2, "needAudit": 2, "needIntegration": 2
+      },
+      "assumptions": [
+        { "field": "users", "label": "Volume set by tickets, not seats", "why": "Support runs on interactions per day. The scale step converts your ticket volume into runs; the 'users' figure is the agent-assist pool.", "verify": true },
+        { "field": "topologyType", "label": "Router plus worker plus summary, human escalation", "why": "Real deployments are routing workflows with escalation paths, not autonomous swarms (a16z: copilots where 100 percent accuracy is not required).", "verify": false },
+        { "field": "toolCallsPerRun", "label": "2 tool calls per ticket", "why": "Order lookup and account fetch. Tool payloads are a silent input-token driver.", "verify": true },
+        { "field": "cachedInputPercent", "label": "55 percent cache hits", "why": "Stable policies and macros cache well; per-ticket context does not.", "verify": false },
+        { "field": "retryRatePercent", "label": "5 percent retries", "why": "Guardrail rejections and tool failures compound silently at volume.", "verify": true }
+      ]
+    },
+    "coding-assistant": {
+      "label": "Coding assistant",
+      "tagline": "IDE and CLI assistants for the engineering org.",
+      "audience": "internal",
+      "howCommon": "The largest category in every source: 55 percent of departmental AI spend (Menlo); a third-plus of all Claude traffic (Anthropic Economic Index).",
+      "patch": {
+        "wlModernAgent": false, "wlCoding": true, "wlAgenticCoding": true,
+        "developers": 40, "codDays": 21, "codHours": 6, "acDevelopers": 10, "acDays": 21, "acHours": 4,
+        "quickInputSharePercent": 60, "cachedInputPercent": 60,
+        "needTimeToValue": 3, "needLowOps": 3, "needQuality": 3, "usagePattern": "bursty"
+      },
+      "assumptions": [
+        { "field": "developers", "label": "Split between assistant and agentic use", "why": "Half of developers use AI daily (Menlo); agentic coding burns roughly 15 percent more tokens per hour than assist-mode.", "verify": true },
+        { "field": "codingTokensPerDevHour", "label": "~91k tokens per assist hour, ~104k agentic", "why": "Field heuristics for sustained daily use, editable. Cursor-class agentic sessions run hotter.", "verify": true },
+        { "field": "quickInputSharePercent", "label": "60/40 input/output split", "why": "Code generation is output-heavier than RAG chat; output tokens cost 5 to 6x input.", "verify": false },
+        { "field": "cachedInputPercent", "label": "60 percent cache hits", "why": "Repo context and system prompts cache well in modern coding tools.", "verify": false }
+      ]
+    },
+    "research-analysis": {
+      "label": "Research and data analysis agent",
+      "tagline": "Deep-dive research and analysis sessions over data and documents.",
+      "audience": "internal",
+      "howCommon": "Number-two agent use case in LangChain's survey (24.4 percent); the one pattern where genuine multi-step agents are real in production.",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "planner-worker-judge", "plannerCalls": 1, "workerAgents": 2, "workerCallsPerAgent": 3, "judgeCalls": 1, "summarizerCalls": 1,
+        "runsPerUserPerDay": 2, "adoptionPercent": 60, "activeDaysPerMonth": 21, "usagePattern": "bursty",
+        "ragEnabled": true, "ragCallsPerRun": 2, "chunksRetrievedPerQuery": 10, "avgTokensPerChunk": 500, "documentsIndexed": 50000,
+        "roles": { "planner": { "inputTokensPerCall": 2500, "outputTokensPerCall": 400 }, "worker": { "inputTokensPerCall": 9000, "outputTokensPerCall": 1200 }, "judge": { "inputTokensPerCall": 6000, "outputTokensPerCall": 400 }, "summarizer": { "inputTokensPerCall": 3000, "outputTokensPerCall": 800 } },
+        "cachedInputPercent": 35, "retryRatePercent": 8, "toolUseEnabled": true, "toolsExposed": 6, "toolCallsPerRun": 4, "avgToolResultTokens": 900,
+        "needQuality": 3, "needModelRouting": 2
+      },
+      "assumptions": [
+        { "field": "runsPerUserPerDay", "label": "2 deep sessions per analyst per day", "why": "Research is session-based, not high-frequency. Each session is expensive instead.", "verify": true },
+        { "field": "topologyType", "label": "True multi-step agent shape", "why": "The one pattern where planner-worker-judge reflects real deployments rather than aspiration.", "verify": false },
+        { "field": "toolCallsPerRun", "label": "4 tool calls per session", "why": "SQL, code execution, and web fetches. Tool results at ~900 tokens each are a first-order cost here.", "verify": true }
+      ]
+    },
+    "document-processing": {
+      "label": "Document processing pipeline",
+      "tagline": "Batch extraction and classification over inbound documents.",
+      "audience": "internal",
+      "howCommon": "Leading pattern in financial services, insurance, and healthcare back offices (market-sizing directional; the medium example Customer is the verified anchor).",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "batch-chain", "plannerCalls": 1, "workerAgents": 3, "workerCallsPerAgent": 1, "judgeCalls": 1, "summarizerCalls": 1,
+        "users": 50, "runsPerUserPerDay": 40, "adoptionPercent": 100, "activeDaysPerMonth": 22, "usagePattern": "steady",
+        "ragEnabled": true, "ragCallsPerRun": 1, "chunksRetrievedPerQuery": 4, "avgTokensPerChunk": 600, "documentsIndexed": 30000,
+        "roles": { "planner": { "inputTokensPerCall": 1200, "outputTokensPerCall": 200 }, "worker": { "inputTokensPerCall": 6000, "outputTokensPerCall": 700 }, "judge": { "inputTokensPerCall": 4000, "outputTokensPerCall": 300 }, "summarizer": { "inputTokensPerCall": 2000, "outputTokensPerCall": 400 } },
+        "cachedInputPercent": 50, "retryRatePercent": 6, "batchEligiblePercent": 70,
+        "humanApprovalRequired": true, "needAudit": 2, "needGovernance": 2
+      },
+      "assumptions": [
+        { "field": "runsPerUserPerDay", "label": "Volume is documents per day, not chats", "why": "50 ops staff overseeing 2,000 documents daily. Set this from the real inbound document count.", "verify": true },
+        { "field": "batchEligiblePercent", "label": "70 percent batch eligible", "why": "Non-interactive pipelines earn the 50 percent batch discount. The biggest single saving in this pattern.", "verify": true },
+        { "field": "judgeCalls", "label": "A judge reviews every determination", "why": "Human-in-the-loop plus machine review is the deployed norm in regulated processing.", "verify": false }
+      ]
+    },
+    "sales-copilot": {
+      "label": "Sales and CRM copilot",
+      "tagline": "Account research, call prep, and outbound drafting in the CRM.",
+      "audience": "internal",
+      "howCommon": "87 percent of sales orgs use some AI; embedded CRM copilots are the most common tool (ZoomInfo n=1002).",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "single", "plannerCalls": 0, "workerAgents": 1, "workerCallsPerAgent": 1, "judgeCalls": 0, "summarizerCalls": 0,
+        "runsPerUserPerDay": 8, "adoptionPercent": 45, "activeDaysPerMonth": 21, "usagePattern": "bursty",
+        "ragEnabled": true, "ragCallsPerRun": 1, "chunksRetrievedPerQuery": 5, "avgTokensPerChunk": 400, "documentsIndexed": 15000,
+        "roles": { "worker": { "inputTokensPerCall": 4500, "outputTokensPerCall": 600 } },
+        "cachedInputPercent": 45, "retryRatePercent": 3, "toolUseEnabled": true, "toolsExposed": 4, "toolCallsPerRun": 2, "avgToolResultTokens": 600,
+        "needTimeToValue": 3, "needIntegration": 2
+      },
+      "assumptions": [
+        { "field": "adoptionPercent", "label": "45 percent weekly-active adoption", "why": "45 percent of sales professionals use AI weekly or more (ZoomInfo). Sales adoption lags engineering.", "verify": true },
+        { "field": "toolCallsPerRun", "label": "CRM and enrichment lookups", "why": "Account and contact fetches drive the integration cost more than the chat does.", "verify": true }
+      ]
+    },
+    "it-service-desk": {
+      "label": "IT service desk agent",
+      "tagline": "Ticket triage, runbook answers, and routine fixes for IT.",
+      "audience": "internal",
+      "howCommon": "IT Ops is 10 percent of departmental spend (Menlo) and the function where McKinsey finds real agentic deployment leading.",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "tool-workflow", "plannerCalls": 1, "workerAgents": 1, "workerCallsPerAgent": 3, "judgeCalls": 0, "summarizerCalls": 1, "toolPlanningCalls": 2, "toolResultSummaryCalls": 2,
+        "runsPerUserPerDay": 15, "adoptionPercent": 90, "activeDaysPerMonth": 22, "usagePattern": "steady",
+        "ragEnabled": true, "ragCallsPerRun": 1, "chunksRetrievedPerQuery": 6, "avgTokensPerChunk": 450, "documentsIndexed": 8000,
+        "roles": { "planner": { "inputTokensPerCall": 1800, "outputTokensPerCall": 250 }, "worker": { "inputTokensPerCall": 4000, "outputTokensPerCall": 450 }, "summarizer": { "inputTokensPerCall": 1500, "outputTokensPerCall": 250 } },
+        "cachedInputPercent": 55, "retryRatePercent": 6, "toolUseEnabled": true, "toolsExposed": 8, "toolCallsPerRun": 3, "avgToolResultTokens": 700,
+        "needIntegration": 3, "needGovernance": 2, "needAudit": 2
+      },
+      "assumptions": [
+        { "field": "topologyType", "label": "Tool-using workflow, genuinely agentic", "why": "Service desk is where McKinsey finds agents actually deployed, not just piloted.", "verify": false },
+        { "field": "toolsExposed", "label": "8 tools exposed", "why": "Ticketing, identity, device management, monitoring. Schema overhead taxes every call.", "verify": true }
+      ]
+    },
+    "content-generation": {
+      "label": "Content generation copilot",
+      "tagline": "Drafting, campaign copy, and brand-grounded content for marketing.",
+      "audience": "internal",
+      "howCommon": "Marketing is 9 percent of departmental spend (Menlo) and a top-reported function in McKinsey's survey.",
+      "patch": {
+        "wlModernAgent": true, "topologyType": "single", "plannerCalls": 0, "workerAgents": 1, "workerCallsPerAgent": 1, "judgeCalls": 0, "summarizerCalls": 0,
+        "runsPerUserPerDay": 10, "adoptionPercent": 65, "activeDaysPerMonth": 21, "usagePattern": "bursty",
+        "ragEnabled": true, "ragCallsPerRun": 1, "chunksRetrievedPerQuery": 4, "avgTokensPerChunk": 400, "documentsIndexed": 3000,
+        "roles": { "worker": { "inputTokensPerCall": 3000, "outputTokensPerCall": 900 } },
+        "cachedInputPercent": 50, "retryRatePercent": 4, "toolUseEnabled": false,
+        "needTimeToValue": 3, "needLowOps": 3
+      },
+      "assumptions": [
+        { "field": "roles.worker.outputTokensPerCall", "label": "900 output tokens per draft", "why": "Content work is output-heavy, and output is the 5-6x priced side. This pattern's economics invert RAG chat.", "verify": true }
+      ]
+    }
+  },
+  "scaleBands": {
+    "team": { "label": "A team (25 to 100 people)", "users": 60 },
+    "department": { "label": "A department (100 to 500)", "users": 240 },
+    "org": { "label": "The whole org (500 to 2,500)", "users": 900 },
+    "external-light": { "label": "Customer-facing, moderate volume (about 1,000 interactions a day)", "users": 50, "runsPerUserPerDay": 20 },
+    "external-heavy": { "label": "Customer-facing, high volume (10,000 plus a day)", "users": 200, "runsPerUserPerDay": 50 }
+  }
+}
