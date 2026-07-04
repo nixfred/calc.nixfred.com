@@ -151,7 +151,7 @@ export function appNav(view, hasLanding) {
   </nav>`;
 }
 
-export function landingPanel(meta, presets) {
+export function landingPanel(meta, presets, hpeConfig = null, sources = []) {
   const rows = (meta.assumptions ?? []).map((a) => `
     <tr class="${a.verify ? 'verify-row' : ''}">
       <td>${a.verify ? '<span class="verify-flag mono">VERIFY</span>' : ''}</td>
@@ -177,6 +177,7 @@ export function landingPanel(meta, presets) {
         ${meta.wizard ? `<p class="dim mono" style="font-size:0.75rem">routed by: ${esc(meta.wizard)}</p>` : ''}
       </div>
       ${notes}
+      ${hpeConfig ? hpeConfigCard(hpeConfig, sources) : ''}
       <div class="btn-row">
         <button class="primary" data-goto="meeting-answer">See the answer</button>
         <button data-goto="architect">Open every dial</button>

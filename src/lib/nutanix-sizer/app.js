@@ -8,6 +8,8 @@ import { sizerEngine, SIZER_DEFAULTS, PRESETS, RF, CVM, applyPreset } from './fo
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export const SIZER_SOURCES = [
+  { id: 'hpe_dx', label: 'HPE ProLiant DX380 Gen11 QuickSpecs (Nutanix-certified)', url: 'https://www.hpe.com/us/en/collaterals/collateral.a50006994enw.html', sourceType: 'server QuickSpecs', vendor: 'HPE', lastReviewed: '2026-07-03' },
+  { id: 'hpe_gen12_nutanix', label: 'HPE ProLiant Compute Gen12 for Nutanix QuickSpecs', url: 'https://www.hpe.com/us/en/collaterals/collateral.a50009240enw.html', sourceType: 'solution QuickSpecs', vendor: 'HPE', lastReviewed: '2026-07-03' },
   { id: 'nutanix_appendix_f', label: 'NutaNIX field guide, appendix F sizing rules', url: 'https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md', sourceType: 'methodology', vendor: 'nixfred/nutanix (public)', lastReviewed: '2026-07-03' },
   { id: 'nutanix_sizer_official', label: 'Nutanix Sizer (the official tool, the source of truth)', url: 'https://sizer.nutanix.com/', sourceType: 'official sizing tool', vendor: 'Nutanix', lastReviewed: '2026-07-03' },
 ];
@@ -53,11 +55,11 @@ export function createSizer(root, summaryEl) {
     const rf = RF[state.rf], cvm = CVM[state.cvmProfile];
     const gates = { CPU: values.nodesByCpu, RAM: values.nodesByRam, storage: values.nodesByStorage };
     const winner = Object.entries(gates).sort((a, b) => b[1] - a[1])[0][0];
-    const answer = `This estate fits in roughly ${floor} to ${ceil} nodes (${state.nodeCores} cores / ${fmt(state.nodeRamGb)} GB / ${state.nodeRawTb} TB raw each) at ${rf.label}.`;
+    const answer = `This estate fits in roughly ${floor} to ${ceil} nodes (HPE ProLiant for Nutanix) (${state.nodeCores} cores / ${fmt(state.nodeRamGb)} GB / ${state.nodeRawTb} TB raw each) at ${rf.label}.`;
 
     const wbText = [
       `Estate: ${fmt(state.vmCount)} VMs, ${fmt(values.storageDemandTb)} TB after ${state.growthWindowMonths} months growth`,
-      `Rough size: ${floor} to ${ceil} nodes at ${rf.label} (binding gate: ${winner})`,
+      `Rough size: ${floor} to ${ceil} nodes (HPE ProLiant for Nutanix) at ${rf.label} (binding gate: ${winner})`,
       `Effective per node: ${fmt(values.effectiveTbPerNode)} TB after RF, reservation, 75 percent ceiling, and data efficiency`,
       `CVM tax paid: ${cvm.vcpu} vCPU + ${cvm.ramGb} GB per node`,
       `This is a pre-sizer estimate, within roughly 25 percent. Nutanix Sizer produces the number that goes in the contract.`,
@@ -72,7 +74,7 @@ export function createSizer(root, summaryEl) {
     ];
 
     const next = [
-      `Run Nutanix Sizer with real workload data: VM inventory, resource consumption, growth. Sizer output becomes the proposal BoM, validated in a POC.`,
+      `Run Nutanix Sizer with real workload data: VM inventory, resource consumption, growth. Sizer output becomes the proposal BoM, validated in a POC. The HPE configurator maps the node range onto specific models: DX380 Gen11 or ProLiant Compute Gen12 for Nutanix.`,
       `Collect before that meeting: per-VM CPU/RAM/storage actuals, peak IOPS and read/write split, RPO/RTO per workload tier, 3 year growth target.`,
       `Risk areas to say out loud: overcommit ratio is a field heuristic (the guide publishes none); CVM specs should be re-validated against current portal documentation; compression and dedup are unvalidated until a POC runs on real data.`,
     ];
@@ -82,6 +84,12 @@ export function createSizer(root, summaryEl) {
       <div class="card"><h3 class="card-title">The answer</h3>
         <p class="rec-headline">${esc(answer)}</p>
         <p class="dim">Binding gate: ${winner}. Pre-sizer estimate, within roughly 25 percent. Never a quote; Nutanix Sizer is the source of truth.</p>
+      </div>
+      <div class="card" id="dx-config-card">
+        <h3 class="card-title">The iron (all HPE, no prices)</h3>
+        <p>${esc(`${floor} to ${ceil} x HPE nodes for Nutanix, each modeled at ${state.nodeCores} cores, ${fmt(state.nodeRamGb)} GB RAM, ${state.nodeRawTb} TB raw. Naming honesty, verified 2026: DX380 exists through Gen11; the Gen12 line is ProLiant Compute Gen12 for Nutanix on DL380-class hardware with AOS factory-installed. Exact models, drives, and NICs come from the HPE configurator, not this page.`)}</p>
+        <p class="dim">Not an orderable BOM. Edit the node profile above to model the box actually under discussion.</p>
+                <div class="src-pills"><a class="src-pill" href="https://www.hpe.com/us/en/collaterals/collateral.a50006994enw.html" target="_blank" rel="noopener">DX380 Gen11 QuickSpecs &middot; reviewed 2026-07-03</a><a class="src-pill" href="https://www.hpe.com/us/en/collaterals/collateral.a50009240enw.html" target="_blank" rel="noopener">Gen12 for Nutanix QuickSpecs &middot; reviewed 2026-07-03</a></div>
       </div>
       <div class="card wb-card"><h3 class="card-title">Whiteboard card</h3>
         <div class="wb-inner">${wbText.map((l) => `<p class="wb-line">${esc(l)}</p>`).join('')}</div>

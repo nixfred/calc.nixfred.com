@@ -45,7 +45,7 @@ export function buildHpeConfig(state, values, ceiling, fin, hardware) {
     ? 'Host networking plus a management network; no backend fabric needed.'
     : gpuCount <= chassis.perServer
       ? 'Single dense server: intra-server interconnect carries the GPU traffic; plan 100 to 400GbE for data path and storage.'
-      : 'Multiple GPU servers: a dedicated 400GbE-class backend fabric is REQUIRED. HPE networking (Juniper QFX class) per formal design.';
+      : 'Multiple GPU servers: a dedicated 400GbE-class backend fabric is REQUIRED. HPE fabric per formal design: Aruba CX 9300 Ethernet or Juniper QFX/PTX class (both are the honest 2026 answer).';
   const budgetLine = state.gpuQuote != null && fin?.payment
     ? `Your ${money(state.gpuQuote)} quote covers this list ${fin.verdict === 'buy' ? 'and clears the bar: smarter to buy' : fin.verdict === 'negotiate' ? 'but does not clear your margin: negotiate' : 'only above the token bill: stay on tokens'}.`
     : `Everything below, all-in (servers, storage, network, services), must land under ${money(ceiling.ceilingCapex)} to be the smarter buy versus tokens. That is the number to negotiate toward.`;
@@ -53,8 +53,8 @@ export function buildHpeConfig(state, values, ceiling, fin, hardware) {
     gpuCount, servers, chassis, hw, gpuPowerKw, storageTb, fabric, budgetLine,
     lines: [
       { qty: servers, item: chassis.server, detail: `${chassis.form}, ${Math.min(chassis.perServer, gpuCount)}x ${hw.vendor} ${hw.name} each${servers > 1 ? `, ${gpuCount} GPUs total` : ''}`, sourceId: chassis.sourceId },
-      { qty: 1, item: 'HPE Alletra Storage MP', detail: `sized to about ${fmt(storageTb, 1)} TB protected (models, vectors, traces at your retention)`, sourceId: 'hpe_alletra_mp' },
-      { qty: 1, item: 'HPE networking, AI fabric', detail: fabric, sourceId: 'hpe_networking_ai' },
+      { qty: 1, item: 'HPE Alletra Storage MP B10000', detail: `sized to about ${fmt(storageTb, 1)} TB protected (models, vectors, traces at your retention)`, sourceId: 'hpe_alletra_mp' },
+      { qty: 1, item: 'HPE AI fabric (Aruba CX 9300 / Juniper QFX-PTX)', detail: fabric, sourceId: 'hpe_networking_ai' },
     ],
     alt: 'The integrated version of this configuration is HPE Private Cloud AI, already scored on your route board.',
     caveats: [

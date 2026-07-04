@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 test('sizer page loads, computes, and shows all four outputs', async ({ page }) => {
   await page.goto('/nutanix-sizer/');
   await expect(page.locator('#sizer-root .a-fields')).toBeVisible();
-  await expect(page.locator('.rec-headline')).toContainText(/fits in roughly \d+ to \d+ nodes/);
+  await expect(page.locator('.rec-headline')).toContainText(/fits in roughly \d+ to \d+ nodes \(HPE ProLiant for Nutanix\)/);
   await expect(page.locator('.wb-card')).toBeVisible();                        // whiteboard card
   await expect(page.locator('.card-title', { hasText: 'Conversation script' })).toBeVisible();
   await expect(page.locator('.card-title', { hasText: 'Next action' })).toBeVisible();
@@ -52,4 +52,12 @@ test('sizer navigation: anchors plus a real Start over (same treatment as TokenO
   await page.locator('.nav-reset').click();
   const s = await page.evaluate(() => window.__sizer.getState());
   expect(s.vmCount).toBe(200);
+});
+
+test('the answer speaks HPE DX and shows the iron card (Fred bonus, 2026-07-03)', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await expect(page.locator('.rec-headline')).toContainText('HPE ProLiant for Nutanix');
+  await expect(page.locator('#dx-config-card')).toBeVisible();
+  await expect(page.locator('#dx-config-card')).toContainText('Not an orderable BOM');
+  await expect(page.locator('#dx-config-card .src-pill').first()).toContainText('DX380 Gen11');
 });
