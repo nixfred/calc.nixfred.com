@@ -343,3 +343,16 @@ test('finance decision: loan payment matches the standard amortization formula',
   expect(fin.payment).toBeCloseTo(3133.64, 1);
   expect(fin.verdict).toBe('buy');
 });
+
+test('a $1 quote is called a typo, not a deal (Fred UX catch)', async () => {
+  const { hardwareCeiling, financeDecision } = await import('../src/lib/tokenops/costs.js');
+  const s = { ...structuredClone(defaults), gpuQuote: 1 };
+  const ceiling = hardwareCeiling(s, 10000);
+  expect(ceiling.verdict.implausible).toBe(true);
+  const fin = financeDecision(s, 10000, ceiling);
+  expect(fin.headline).toBe('THAT IS NOT A QUOTE');
+  // A real quote still verdicts normally.
+  const real = hardwareCeiling({ ...s, gpuQuote: 150000 }, 10000);
+  expect(real.verdict.implausible).toBeUndefined();
+  expect(real.verdict.under).toBe(true);
+});
