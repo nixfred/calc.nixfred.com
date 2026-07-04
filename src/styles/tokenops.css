@@ -270,3 +270,4 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .nav-item.on { color: var(--accent); border-color: var(--accent); }
 .nav-reset { margin-left: auto; color: #e8c98a; border-color: #6b5a2e; }
 .nav-reset:hover { border-color: #e8c98a; color: #e8c98a; }
+#ns-estate, #ns-results, #ns-formulas { scroll-margin-top: calc(var(--header-h) + 4.5rem); }
