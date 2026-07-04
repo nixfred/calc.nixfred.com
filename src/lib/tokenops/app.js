@@ -144,7 +144,9 @@ export function createApp(root, data) {
       <div class="quote-slot">
         <label for="f-gpuQuote-inline">Enter a real quote (USD)</label>
         <input id="f-gpuQuote-inline" type="number" min="0" step="1000" data-field="gpuQuote" value="${state.gpuQuote ?? ''}">
-        ${cx.ceiling.verdict ? `<p class="verdict ${cx.ceiling.verdict.under ? 'under' : 'over'}">${cx.ceiling.verdict.under ? 'UNDER the ceiling' : 'OVER the ceiling'} by ${money(cx.ceiling.verdict.delta)} (${money(cx.ceiling.verdict.monthlyEquivalent)} per month equivalent). ${cx.ceiling.verdict.under ? 'This quote beats the token route by your required margin.' : 'This quote does not beat the token route. Negotiate or stay on tokens.'}</p>` : ''}
+        ${cx.ceiling.verdict ? (cx.ceiling.verdict.implausible
+          ? `<p class="verdict over">That is not a real quote. Enter the actual all-in number (anything under ${money(cx.ceiling.verdict.floor)} here is a typo, not a deal).</p>`
+          : `<p class="verdict ${cx.ceiling.verdict.under ? 'under' : 'over'}">${cx.ceiling.verdict.under ? 'UNDER' : 'OVER'} the ${money(cx.ceiling.ceilingCapex)} ceiling by ${money(cx.ceiling.verdict.delta)}. Amortized, this quote costs ${money(cx.ceiling.verdict.monthlyEquivalent)} per month against the ${money(cx.ceiling.ceilingMonthly)} monthly bar. ${cx.ceiling.verdict.under ? 'It beats the token route by your required margin.' : 'It does not clear your margin. Negotiate, or stay on tokens.'}</p>`) : ''}
       </div>
       <p class="dim">Ceiling baseline in use: ${state.ceilingBaseline === 'selected' ? 'your selected role routing total' : 'the cheapest provider family total'} (change under Economics and the ceiling).</p>
       ${cx.selected.missingRoles?.length ? `<p class="warn warn-caution"><span class="warn-tag">caution</span> No price for ${cx.selected.missingRoles.join(', ')}. Those tokens are counted in demand but excluded from every dollar figure until a rate is entered.</p>` : ''}
@@ -310,15 +312,28 @@ export function createApp(root, data) {
     });
   }
 
-  /* Refresh computed zones without touching focused inputs. */
+  /* Refresh computed zones. The results panel contains live inputs (quote
+     box, sliders), so focus and caret must survive the innerHTML rebuild
+     or typing feels like the screen locks (Fred hit this live). */
   function refreshResults() {
     const cx = compute();
+    const active = document.activeElement;
+    const restore = active && active.id && (active.closest('#results') || active.closest('[data-traces-for]'))
+      ? { id: active.id, start: active.selectionStart, end: active.selectionEnd }
+      : null;
     document.querySelectorAll('[data-traces-for]').forEach((el) => {
       el.innerHTML = sectionTraces(el.dataset.tracesFor, cx);
     });
     const res = document.getElementById('results');
     if (res && view === 'architect') res.innerHTML = `<h2 class="a-title">Results</h2>${resultsStack(cx, false)}`;
     if (res && view === 'meeting') res.innerHTML = resultsStack(cx, true);
+    if (restore) {
+      const el = document.getElementById(restore.id);
+      if (el) {
+        el.focus({ preventScroll: true });
+        if (restore.start != null && el.setSelectionRange) try { el.setSelectionRange(restore.start, restore.end); } catch {}
+      }
+    }
     updateSummaryBar();
     X.persistence.autosave(state, weightOverrides);
   }

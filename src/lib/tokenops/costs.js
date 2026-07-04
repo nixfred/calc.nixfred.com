@@ -175,11 +175,16 @@ export function hardwareCeiling(state, providerMonthlyCost) {
   const ceilingMonthly = providerMonthlyCost * threshold;
   const ceilingCapex = ceilingMonthly * state.usefulLifeMonths;
   const quote = state.gpuQuote;
-  const verdict = quote == null ? null : {
+  // A "$1 quote" is not a quote. Below 2 percent of the ceiling (or $1,000,
+  // whichever is larger) the verdict refuses to pretend (Fred's catch).
+  const plausibleFloor = Math.max(1000, ceilingCapex * 0.02);
+  const verdict = quote == null ? null : (quote > 0 && quote < plausibleFloor ? {
+    implausible: true, floor: plausibleFloor,
+  } : {
     under: quote <= ceilingCapex,
     delta: Math.abs(ceilingCapex - quote),
     monthlyEquivalent: quote / state.usefulLifeMonths,
-  };
+  });
   return {
     ceilingMonthly, ceilingCapex, verdict,
     traces: [
@@ -306,6 +311,13 @@ export function financeDecision(state, providerMonthlyCost, ceiling) {
       verdict: 'quote',
       headline: 'GET A QUOTE',
       reason: `Tokens cost ${money(providerMonthlyCost)} per month. Any hardware quote under ${money(ceiling.ceilingCapex)} all-in beats that by your ${Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40))} percent margin. Bring a number and this becomes a verdict.`,
+    };
+  }
+  if (ceiling.verdict?.implausible) {
+    return {
+      verdict: 'quote',
+      headline: 'THAT IS NOT A QUOTE',
+      reason: `${money(quote)} is not a believable all-in hardware number for this workload. Enter the real quote; the math only earns trust when the inputs do.`,
     };
   }
   // Monthly cost of owning: amortized cash, or standard loan payment.
