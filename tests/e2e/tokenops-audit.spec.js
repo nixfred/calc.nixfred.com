@@ -120,7 +120,7 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
       'https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/',
       'https://www.nvidia.com/en-us/data-center/h200/',
       'https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html',
-      'buy.hpe.com', // XD685 listing (criterion 45.25)
+      'proliant-compute-xd685', // XD685 canonical page (criterion 45.25, URL upgraded 2026-07-03)
     ]) expect(html).toContain(url);
   });
 
@@ -414,4 +414,12 @@ test('HPE configuration card renders with the ceiling bar and vendor links, both
   await page.locator('.persona-card[data-persona="0"]').click();
   await page.locator('button.primary[data-goto="meeting-answer"]').click();
   await expect(page.locator('#hpe-config-card')).toBeVisible();
+});
+
+test('example Customer landings carry the HPE configuration too', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="1"]').click(); // Harborline Mutual
+  await expect(page.locator('h1')).toContainText('Harborline');
+  await expect(page.locator('#hpe-config-card')).toBeVisible();
+  await expect(page.locator('.config-budget')).toContainText('must land under');
 });

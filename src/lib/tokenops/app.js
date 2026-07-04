@@ -348,7 +348,7 @@ export function createApp(root, data) {
     if (view === 'landing' && !landingMeta) view = 'start';
     const nav = C.appNav(view, !!landingMeta);
     if (view === 'start') { root.innerHTML = nav + C.startScreen(PRESETS_REG, EXAMPLE_CUSTOMERS, startSel); decodeIn(root); updateSummaryBar(); return; }
-    if (view === 'landing') { root.innerHTML = nav + C.landingPanel(landingMeta, PRESETS_REG); decodeIn(root); updateSummaryBar(); return; }
+    if (view === 'landing') { const lcx = compute(); root.innerHTML = nav + C.landingPanel(landingMeta, PRESETS_REG, lcx.hpeConfig, sources); decodeIn(root); updateSummaryBar(); return; }
     else if (view === 'meeting') renderMeeting();
     else renderArchitect();
     updateSummaryBar();

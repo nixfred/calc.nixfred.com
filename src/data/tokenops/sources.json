@@ -83,10 +83,11 @@
   {
     "id": "hpe_xd685",
     "label": "HPE ProLiant Compute XD685",
-    "url": "https://buy.hpe.com/in/en/compute/rack-servers/proliant-compute-xd600-servers/hpe-proliant-compute-xd685/p/1014862906",
+    "url": "https://www.hpe.com/us/en/compute/proliant-compute-xd685.html",
     "sourceType": "server product page",
     "vendor": "HPE",
-    "lastReviewed": "2026-07-03"
+    "lastReviewed": "2026-07-03",
+    "note": "Canonical page verified by search corroboration 2026-07-03; buy.hpe.com listing is the fallback."
   },
   {
     "id": "hpe_private_cloud_ai",
@@ -130,16 +131,16 @@
   },
   {
     "id": "hpe_alletra_mp",
-    "label": "HPE Alletra Storage MP",
-    "url": "https://www.hpe.com/us/en/hpe-alletra-storage-mp.html",
+    "label": "HPE Alletra Storage MP B10000",
+    "url": "https://www.hpe.com/us/en/alletra-storage-mp-b10000.html",
     "sourceType": "storage product page",
     "vendor": "HPE",
     "lastReviewed": "2026-07-03"
   },
   {
     "id": "hpe_networking_ai",
-    "label": "HPE networking for AI fabrics",
-    "url": "https://www.hpe.com/us/en/networking.html",
+    "label": "HPE AI data center fabric (Aruba CX 9300 + Juniper QFX/PTX)",
+    "url": "https://www.hpe.com/us/en/juniper-ai-data-center.html",
     "sourceType": "networking product page",
     "vendor": "HPE",
     "lastReviewed": "2026-07-03"
