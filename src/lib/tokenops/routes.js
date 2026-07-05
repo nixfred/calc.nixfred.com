@@ -97,17 +97,25 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
     push('direct', rules.routes.direct.label, c, p);
   }
 
-  const directScore = routes.find((r) => r.key === 'direct').raw;
+  // Carry direct's POSITIVE fit (time to value, quality, low ops, bursty)
+  // before direct's own policy penalty, so cloud inherits the fit it genuinely
+  // shares and then pays its OWN, lower, policy penalty. Carrying the raw
+  // (post-penalty) score would zero cloud's fit exactly when policy bites.
+  const directRoute = routes.find((r) => r.key === 'direct');
+  const directPositive = directRoute.components.reduce((a, c) => a + Math.max(0, c.points), 0);
 
   // Cloud model service
   {
     const c = [
-      { label: 'Carries direct provider fit', points: Math.max(0, directScore) * w(rules, 'cloud', 'directCarryFactor', overrides) },
+      { label: 'Carries direct provider fit (before policy)', points: Math.max(0, directPositive) * w(rules, 'cloud', 'directCarryFactor', overrides) },
       { label: 'Existing cloud preference match', points: state.cloudPreference ? w(rules, 'cloud', 'cloudPreferenceMatch', overrides) : 0 },
       { label: 'Marketplace billing required', points: state.marketplaceBilling ? w(rules, 'cloud', 'marketplaceBilling', overrides) : 0 },
       { label: 'Residency friendlier than direct', points: state.residencyRequired ? w(rules, 'cloud', 'residencyFriendly', overrides) : 0 },
     ];
-    push('cloud', rules.routes.cloud.label, c, []);
+    const p = [
+      { label: `Private policy pressure (${pol.score} pts * ${fmt(w(rules, 'cloud', 'privatePolicyFactor', overrides), 2)} factor, lower than direct because private endpoints and residency regions reduce exposure)`, points: pol.score * w(rules, 'cloud', 'privatePolicyFactor', overrides) },
+    ];
+    push('cloud', rules.routes.cloud.label, c, p);
   }
 
   // Airia
@@ -155,9 +163,13 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
 
   // Rented GPU validation
   {
-    const pressure = ctx.providerMonthlyCost > 50000 ? 1 : ctx.providerMonthlyCost > 10000 ? 0.6 : ctx.providerMonthlyCost > 2000 ? 0.3 : 0;
+    // Cost-pressure breakpoints live in route-rules.json now, visible and
+    // slidable, instead of hardcoded here. First band whose floor is met wins.
+    const bands = rules.routes.rentedGpu?.costPressureBands ?? [{ minMonthly: 50000, factor: 1 }, { minMonthly: 10000, factor: 0.6 }, { minMonthly: 2000, factor: 0.3 }];
+    const band = bands.find((b) => ctx.providerMonthlyCost > b.minMonthly);
+    const pressure = band?.factor ?? 0;
     const c = [
-      { label: `Token cost pressure (${money(ctx.providerMonthlyCost)} per month)`, points: pressure * w(rules, 'rentedGpu', 'tokenCostPressure', overrides) },
+      { label: `Token cost pressure (${money(ctx.providerMonthlyCost)} per month, ${fmt(pressure * 100)} percent band)`, points: pressure * w(rules, 'rentedGpu', 'tokenCostPressure', overrides) },
       { label: 'No measured benchmark exists', points: state.userBenchmarkTpsPerGpu == null ? w(rules, 'rentedGpu', 'benchmarkNeed', overrides) : 0 },
       { label: 'Usage still estimated', points: state.usageConfidence !== 'measured' ? w(rules, 'rentedGpu', 'usageUncertainty', overrides) : 0 },
       { label: 'Private model candidate', points: pol.score > 40 ? w(rules, 'rentedGpu', 'privateModelCandidate', overrides) : 0 },
@@ -202,7 +214,8 @@ export function scoreRoutes(state, values, rules, ctx, overrides) {
       { label: 'Escalation to premium model', points: (state.escalationPercent ?? 0) > 0 ? w(rules, 'hybrid', 'escalationNeed', overrides) : 0 },
       { label: 'Model routing need', points: L(state.needModelRouting) * w(rules, 'hybrid', 'needModelRouting', overrides) },
       { label: 'Mixed policy posture', points: state.dataCanLeave === 'with-controls' ? w(rules, 'hybrid', 'policyMixed', overrides) : 0 },
-      { label: 'Route flexibility need', points: L(state.needModelRouting) * w(rules, 'hybrid', 'routeFlexibility', overrides) },
+      // routeFlexibility removed: it scaled by needModelRouting, the same 0-3
+      // answer the 'Model routing need' component already scores.
     ];
     push('hybrid', rules.routes.hybrid.label, c, []);
   }
@@ -244,16 +257,30 @@ export function recommend(state, values, rules, ctx, overrides) {
   }
   const [top, second] = routes;
   const tie = second && (top.score - second.score) <= margin;
+  // Explain the win by MAGNITUDE, not declaration order, so the named reason
+  // is actually the dominant one (audit finding: bursty won but time-to-value
+  // was cited).
+  const byMag = (arr) => [...arr].sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
+  const topSorted = byMag(top.components);
   const rulesFired = [
-    ...top.components.slice(0, 4).map((c) => `${c.label} added ${fmt(c.points, 1)} points to ${top.label}.`),
-    ...top.penalties.map((c) => `${c.label} cost ${top.label} ${fmt(c.points, 1)} points.`),
+    ...topSorted.slice(0, 4).map((c) => `${c.label} added ${fmt(c.points, 1)} points to ${top.label}.`),
+    ...byMag(top.penalties).map((c) => `${c.label} cost ${top.label} ${fmt(c.points, 1)} points.`),
   ];
-  if (tie) rulesFired.push(`${second.label} landed within ${margin} points, so both routes are viable and the tradeoff is stated instead of hidden.`);
+  if (tie) {
+    const topLead = topSorted.find((c) => c.points > 0);
+    const secondLead = byMag(second.components).find((c) => c.points > 0);
+    rulesFired.push(`${second.label} landed within ${margin} points, so both routes are viable. ${top.label} leads on ${topLead ? `${topLead.label} (${fmt(topLead.points, 1)} pts)` : 'its top factor'}; ${second.label} leads on ${secondLead ? `${secondLead.label} (${fmt(secondLead.points, 1)} pts)` : 'its top factor'}.`);
+  }
   // Spec 37 critical warning: leading route conflicts with the policy gate.
+  // Also fires when the forbidden public route is the co-recommended SECOND,
+  // so a policy-forbidden route can never print without the conflict stated.
   const warnings = [];
-  if (['direct', 'cloud'].includes(top.key) && state.dataCanLeave === 'no') {
-    warnings.push({ severity: 'critical', message: 'The leading route sends data to a public provider, but the policy gate says data cannot leave the customer environment. Treat private or hybrid routes as the real candidates.' });
-    rulesFired.push('Policy conflict: leading route allows data to leave; the gate forbids it.');
+  const forbiddenPublic = (r) => r && ['direct', 'cloud'].includes(r.key) && state.dataCanLeave === 'no';
+  const offenders = [top, tie ? second : null].filter(forbiddenPublic);
+  if (offenders.length) {
+    const which = offenders.map((r) => r.label).join(' and ');
+    warnings.push({ severity: 'critical', message: `${which} send data to a public provider, but the policy gate says data cannot leave the customer environment. Treat private or hybrid routes as the real candidates.` });
+    rulesFired.push('Policy conflict: a recommended route allows data to leave; the gate forbids it.');
   }
   // Spec 31.10.7: missing data shown on every recommendation, not only do-not-size.
   const missingData = [];
