@@ -2,8 +2,34 @@
    FormulaTrace blocks render ALWAYS EXPANDED (decision 0.5.20). */
 
 import { fmt, money } from './engine.js';
+import { infoButton } from './teach.js';
+export { infoButton };
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* The four-outputs law: the customer answer, the whiteboard card, and the
+   next action all exist; this is the conversation script, the words the seller
+   actually says. Every dollar figure is the same variable shown in the ceiling
+   card and traces above, so a line can be read aloud and pointed at. */
+export function scriptCard(cx, state) {
+  const rec = cx.rec;
+  if (!rec || rec.kind === 'do-not-size') return '';
+  const pct = Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40));
+  const lines = [
+    `On the answer: "The math points to ${esc(rec.top.label)}. Tokens at this shape run about ${money(cx.providerBaseline)} a month, and every assumption behind that number is on this screen."`,
+    `On buying hardware: "Nobody should buy GPUs off an estimate. A real quote has to come in under ${money(cx.ceiling.ceilingCapex)} all-in to beat tokens by the ${pct} percent margin you set."`,
+  ];
+  if (state.usageConfidence !== 'measured') {
+    lines.push('On confidence: "These usage numbers are estimated, not measured. Treat this as direction today and commitment after a 30 to 60 day telemetry pilot."');
+  }
+  if ((rec.warnings ?? []).some((w) => w.severity === 'critical')) {
+    lines.push('On policy: "Your own gate says data cannot leave. Anything public is off the table until that changes, whatever the economics say."');
+  }
+  return `<div class="card"><h3 class="card-title">Conversation script</h3>
+    <ol>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ol>
+    <button class="copy-btn" data-copy="${esc(lines.join('\n\n'))}">copy script</button>
+  </div>`;
+}
 
 export function sourceLinkPills(sourceIds, sources) {
   if (!sourceIds?.length) return '';
@@ -105,7 +131,7 @@ export function startScreen(presets, personas, sel) {
     </button>`).join('');
   const personaCards = personas.map((p, i) => `
     <button type="button" class="persona-card" data-persona="${i}">
-      <span class="pc-tier mono">${esc(p.tier.toUpperCase())}</span>
+      <span class="pc-tier mono">${esc(p.scaleLabel ?? p.tier.toUpperCase())}</span>
       <span class="pc-label">${esc(p.companyName)}</span>
       <span class="pc-tag dim">${esc(p.industry)}</span>
     </button>`).join('');
@@ -126,6 +152,7 @@ export function startScreen(presets, personas, sel) {
   return `
     <div class="start">
       <h1>What are you building?</h1>
+      <p class="lede">Answers what this workload costs per month and where it should run.</p>
       <p class="dim">Every session starts from a real-world pattern. Grounded in 2025-2026 production deployment research, every assumption shown and adjustable.</p>
       <div class="pattern-grid">${patternCards}</div>
       ${followups}
@@ -230,8 +257,9 @@ export function decisionCard(state, fin, providerMonthlyCost, ceiling) {
   const qMax = Math.max(Math.ceil((ceiling.ceilingCapex || 50000) * 2 / 1000) * 1000, 50000);
   const banner = `<div class="verdict-banner v-${esc(fin.verdict)}">
       <span class="v-head mono">${esc(fin.headline)}</span>
-      <span class="v-reason">${esc(fin.reason)}</span>
+      <span class="v-reason">${esc(fin.reason)}${fin.routeNote ? ` ${esc(fin.routeNote)}` : ''}</span>
     </div>`;
+  const isCash = (state.financeMode ?? 'cash') !== 'financed';
   const roi = fin.verdict === 'quote' ? '' : `
     <div class="roi-grid">
       <div class="roi-cell"><span class="sum-label">tokens per month</span><span class="sum-value mono">${money(providerMonthlyCost)}</span></div>
@@ -249,30 +277,30 @@ export function decisionCard(state, fin, providerMonthlyCost, ceiling) {
     ${roi}
     <div class="finance-sliders">
       <label class="slider-row">
-        <span class="slider-label">Hardware quote</span>
+        <span class="slider-label">Hardware quote${infoButton('gpuQuote')}</span>
         <input type="range" min="0" max="${qMax}" step="1000" value="${state.gpuQuote ?? 0}" data-field="gpuQuote" aria-label="hardware quote dollars">
         <span class="mono slider-val">${money(state.gpuQuote ?? 0)}</span>
       </label>
       <label class="slider-row">
-        <span class="slider-label">How to pay</span>
+        <span class="slider-label">How to pay${infoButton('financeMode')}</span>
         <select data-field="financeMode" style="max-width:12rem">
-          <option value="cash" ${state.financeMode !== 'financed' ? 'selected' : ''}>Cash (amortize over term)</option>
-          <option value="financed" ${state.financeMode === 'financed' ? 'selected' : ''}>Financed (loan payment)</option>
+          <option value="cash" ${isCash ? 'selected' : ''}>Cash (amortize over useful life)</option>
+          <option value="financed" ${!isCash ? 'selected' : ''}>Financed (loan payment)</option>
         </select>
         <span></span>
       </label>
-      <label class="slider-row">
-        <span class="slider-label">Term months</span>
-        <input type="range" min="12" max="60" step="6" value="${state.financeTermMonths ?? 36}" data-field="financeTermMonths" aria-label="finance term months">
+      <label class="slider-row ${isCash ? 'slider-muted' : ''}">
+        <span class="slider-label">Term months${infoButton('financeTermMonths')}</span>
+        <input type="range" min="12" max="60" step="6" value="${state.financeTermMonths ?? 36}" data-field="financeTermMonths" aria-label="finance term months" ${isCash ? 'disabled' : ''}>
         <span class="mono slider-val">${state.financeTermMonths ?? 36}</span>
       </label>
-      <label class="slider-row">
-        <span class="slider-label">APR percent</span>
-        <input type="range" min="0" max="15" step="0.5" value="${state.financeAprPercent ?? 8}" data-field="financeAprPercent" aria-label="finance APR percent">
+      <label class="slider-row ${isCash ? 'slider-muted' : ''}">
+        <span class="slider-label">APR percent${infoButton('financeAprPercent')}</span>
+        <input type="range" min="0" max="15" step="0.5" value="${state.financeAprPercent ?? 8}" data-field="financeAprPercent" aria-label="finance APR percent" ${isCash ? 'disabled' : ''}>
         <span class="mono slider-val">${state.financeAprPercent ?? 8}%</span>
       </label>
     </div>
-    <p class="dim">Drag the quote until the verdict flips. That crossing point is the number to negotiate toward. Financing does not change what tokens cost; it changes the monthly bar the hardware must clear.</p>
+    <p class="dim">${isCash ? `Term and APR apply when financed. Cash amortizes over the useful life, ${state.usefulLifeMonths ?? 36} months, the same window as the ceiling. ` : ''}Drag the quote until the verdict flips. That crossing point is the number to negotiate toward. Financing does not change what tokens cost; it changes how you pay for the hardware.</p>
   </div>`;
 }
 

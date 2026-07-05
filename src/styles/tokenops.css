@@ -333,3 +333,8 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .field-flash { animation: fieldFlash 1.2s ease; }
 @keyframes fieldFlash { 0%, 100% { box-shadow: none; } 20%, 60% { box-shadow: 0 0 0 2px var(--accent); } }
 @media (prefers-reduced-motion: reduce) { .field-flash { animation: none; outline: 2px solid var(--accent); } }
+
+/* ---------- point release: TokenOps guidance ---------- */
+.lede { font-size: 1.05rem; color: var(--text); margin: 0.2rem 0 0.6rem; }
+.slider-muted { opacity: 0.5; }
+.slider-muted input { cursor: not-allowed; }

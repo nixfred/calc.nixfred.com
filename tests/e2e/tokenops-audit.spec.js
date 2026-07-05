@@ -450,3 +450,41 @@ test('teach layer: (i) opens the glowing popover with all four sections, closes 
   await page.keyboard.press('Escape');
   await expect(page.locator('#teach-overlay')).toHaveCount(0);
 });
+
+/* ---------- point release: guidance, four outputs, sayable ---------- */
+
+test('answer comes before the recap, and the conversation script exists', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="1"]').click(); // Harborline
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  await expect(page.locator('.rec-headline').first()).toBeVisible();
+  // The fourth output now exists: a conversation script.
+  await expect(page.locator('.card-title', { hasText: 'Conversation script' })).toBeVisible();
+  // The one-sentence answer (Recommendation) renders before the recap.
+  const titles = await page.evaluate(() => [...document.querySelectorAll('#results .card-title')].map((e) => e.textContent));
+  const recIdx = titles.findIndex((t) => /Recommendation/.test(t));
+  const recapIdx = titles.findIndex((t) => /What you told it/.test(t));
+  expect(recIdx).toBeGreaterThanOrEqual(0);
+  expect(recapIdx).toBeGreaterThan(recIdx);
+});
+
+test('whiteboard why is sayable, not scoring jargon', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="1"]').click();
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  const why = await page.locator('.wb-why, .wb-inner').first().textContent();
+  // No "N points" jargon on the whiteboard the seller reads aloud.
+  expect(why).not.toMatch(/\d+\.\d+ points/);
+});
+
+test('cash mode mutes the term and APR sliders and says why', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="2"]').click(); // Northgale
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  await expect(page.locator('#decision-card')).toBeVisible();
+  // Default cash mode: term and APR disabled, with the explaining sentence.
+  await expect(page.locator('.slider-row.slider-muted input[data-field="financeTermMonths"]')).toBeDisabled();
+  await expect(page.locator('#decision-card')).toContainText('Cash amortizes over the useful life');
+  // Finance controls carry teach info buttons (previously dead content).
+  await expect(page.locator('#decision-card .info-btn[data-teach="financeMode"]')).toBeVisible();
+});

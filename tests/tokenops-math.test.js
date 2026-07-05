@@ -11,6 +11,7 @@ import { sourceLinkPills } from '../src/lib/tokenops/components.js';
 import defaults from '../src/data/tokenops/tokenops-defaults.json';
 import rules from '../src/data/tokenops/route-rules.json';
 import rates from '../src/data/tokenops/provider-rates.json';
+import personas from '../src/data/tokenops/example-customers.json';
 
 const state = structuredClone(defaults);
 
@@ -342,6 +343,29 @@ test('finance decision: loan payment matches the standard amortization formula',
   // 100000 at 8% APR over 36 months: r=0.0066667, payment = 3133.64
   expect(fin.payment).toBeCloseTo(3133.64, 1);
   expect(fin.verdict).toBe('buy');
+});
+
+test('example Customer stories do not contradict the engine (calls and daily volume)', () => {
+  // Every load-bearing number a persona quotes must be reproducible by running
+  // that persona through the same engine the tool uses. Catches story drift.
+  const check = (company, expect_) => {
+    const p = personas.find((x) => x.companyName === company);
+    const { values } = engine.evaluate({ ...structuredClone(defaults), ...p.inputs }, {});
+    const ad = p.inputs.activeDaysPerMonth ?? 22;
+    const runsDay = Math.round(values.monthlyRuns / ad);
+    const callsDay = Math.round(runsDay * values.baseCallsPerRun);
+    const blob = JSON.stringify(p);
+    expect(values.baseCallsPerRun).toBe(expect_.baseCalls);
+    // If the story cites a daily model-calls figure, it must be the real one.
+    if (expect_.callsDayStr) expect(blob).toContain(expect_.callsDayStr);
+    // The wrong figures must be gone.
+    for (const wrong of expect_.mustNotContain ?? []) expect(blob).not.toContain(wrong);
+    return { runsDay, callsDay, tokDayB: values.totalMonthlyTokens / ad / 1e9 };
+  };
+  const h = check('Harborline Mutual', { baseCalls: 12, callsDayStr: '74,880', mustNotContain: ['94,000', '15 calls each', '15 model calls per run'] });
+  expect(h.callsDay).toBe(74880);
+  const n = check('Northgale Communications', { baseCalls: 15, mustNotContain: ['27 billion tokens'] });
+  expect(Math.round(n.tokDayB)).toBe(37); // story now says ~37 billion, matching
 });
 
 test('finance and break even use ONE ownership payment (no card disagreement)', async () => {

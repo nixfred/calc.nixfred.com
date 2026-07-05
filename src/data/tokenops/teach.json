@@ -3303,6 +3303,36 @@
           "url": "https://en.wikipedia.org/wiki/Erasure_code"
         }
       ]
+    },
+    {
+      "key": "servableSharePercent",
+      "title": "Servable share",
+      "what": "The fraction of this workload the owned model can serve at acceptable quality. The ceiling only covers what you route to owned hardware; the rest stays on tokens.",
+      "why": "The provider bill that sets the ceiling is priced at frontier rates, but self-hosted hardware runs an open model. If the owned model cannot match quality on part of the work, that part stays on the token bill. Saying servable share out loud is how you answer the first objection: you priced Opus-class work and you are buying Llama-class hardware.",
+      "math": "ceilingMonthly = providerMonthlyCost x servableShare x (1 - savingsThreshold). At 70 percent servable, only 70 percent of the bill is available to beat with hardware; the other 30 percent is a stated hybrid remainder on tokens.",
+      "related": [
+        {
+          "label": "Open model quality vs frontier (LMArena)",
+          "url": "https://lmarena.ai/"
+        }
+      ]
+    },
+    {
+      "key": "cacheWriteSharePercent",
+      "title": "Cache write share",
+      "what": "The fraction of input tokens that populate the prompt cache and are billed as cache writes. Default 0 leaves pricing unchanged.",
+      "why": "Prompt caching is not free to fill. Anthropic bills a 5-minute cache write at 1.25x the base input rate; the discount only comes on later reads. If your workload rewrites the cache often (short-lived sessions, changing prefixes), the write premium is real money the naive cache math misses.",
+      "math": "cache write cost = inputTokens x cacheWriteShare x cacheWritePerMillion. Cache hits apply only to the stable prompt prefix; retrieved and tool tokens change per call and cannot be prefix cached.",
+      "related": [
+        {
+          "label": "Anthropic prompt caching pricing",
+          "url": "https://platform.claude.com/docs/en/about-claude/pricing"
+        },
+        {
+          "label": "OpenAI prompt caching",
+          "url": "https://developers.openai.com/api/docs/pricing"
+        }
+      ]
     }
   ]
 }
