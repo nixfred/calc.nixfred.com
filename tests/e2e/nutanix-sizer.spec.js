@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 
 const openTool = async (page) => {
   await page.goto('/nutanix-sizer/');
-  await page.locator('button[data-goto="tool"]').click();
+  await page.locator('.start-skip button[data-goto="tool"]').click();
 };
 
 test('front door: categories are the entry, grounded in the field guide', async ({ page }) => {
@@ -122,4 +122,74 @@ test('teach layer: EVERY sizer input has a working four-section popover', async 
     await page.keyboard.press('Escape');
   }
   await expect(page.locator('#teach-overlay')).toHaveCount(0);
+});
+
+/* ---------- estate file import (Collector + RVTools) ---------- */
+
+import { collectorFixture, rvtoolsFixture, makeXlsx } from '../helpers/make-xlsx.js';
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+test('import: drop zone on the front door states the privacy promise', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await expect(page.locator('#ns-drop')).toBeVisible();
+  await expect(page.locator('#ns-drop')).toContainText('never leaves this machine');
+  await expect(page.locator('.info-btn[data-teach="sizer-import"]')).toBeVisible();
+});
+
+test('import: Collector file lands on a provenance-first starting point', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await page.setInputFiles('#ns-import-file', {
+    name: 'collector-lab.xlsx', mimeType: XLSX_MIME, buffer: Buffer.from(collectorFixture()),
+  });
+  await expect(page.locator('h1')).toContainText('Imported: collector-lab.xlsx');
+  await expect(page.locator('.landing-story')).toContainText('6 powered-on VMs');
+  await expect(page.locator('.landing-story')).toContainText('Collector 6.1');
+  await expect(page.locator('.landing-story')).toContainText('never left this machine');
+  expect(await page.locator('.verify-flag').count()).toBeGreaterThanOrEqual(3);
+  const s = await page.evaluate(() => window.__sizer.getState());
+  expect(s.vmCount).toBe(6);
+  expect(s.avgVcpuPerVm).toBe(6.0);
+  expect(s.usedStorageTb).toBe(9.0);
+  await page.locator('button.primary[data-goto="tool-answer"]').click();
+  await expect(page.locator('.rec-headline')).toContainText(/fits in roughly \d+ to \d+ nodes/);
+});
+
+test('import: RVTools file derives the estate with In Use basis', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await page.setInputFiles('#ns-import-file', {
+    name: 'rvtools-prod.xlsx', mimeType: XLSX_MIME, buffer: Buffer.from(rvtoolsFixture()),
+  });
+  await expect(page.locator('h1')).toContainText('Imported: rvtools-prod.xlsx');
+  await expect(page.locator('.landing-story')).toContainText('RVTools');
+  const s = await page.evaluate(() => window.__sizer.getState());
+  expect(s.vmCount).toBe(5);
+  expect(s.avgRamGbPerVm).toBe(12.8);
+  expect(s.usedStorageTb).toBe(4.1);
+  await expect(page.locator('td', { hasText: 'In Use MiB' }).first()).toBeVisible();
+});
+
+test('import: a wrong file fails loudly and the front door keeps working', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await page.setInputFiles('#ns-import-file', {
+    name: 'budget.xlsx', mimeType: XLSX_MIME, buffer: Buffer.from(makeXlsx({ Sheet1: [['a'], [1]] })),
+  });
+  await expect(page.locator('#ns-import-error')).toBeVisible();
+  await expect(page.locator('#ns-import-error')).toContainText('Not a Collector or RVTools export');
+  await expect(page.locator('.start h1')).toBeVisible();
+  await page.locator('.pattern-card[data-cat="vdi-euc"]').click();
+  await expect(page.locator('h1')).toContainText('VDI');
+});
+
+test('import: Start over after an import wipes back to the front door defaults', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await page.setInputFiles('#ns-import-file', {
+    name: 'collector-lab.xlsx', mimeType: XLSX_MIME, buffer: Buffer.from(collectorFixture()),
+  });
+  await expect(page.locator('h1')).toContainText('Imported');
+  await page.locator('.nav-reset').click();
+  await expect(page.locator('.start h1')).toContainText('What are you sizing?');
+  const s = await page.evaluate(() => window.__sizer.getState());
+  expect(s.vmCount).toBe(200);
+  expect(s.usedStorageTb).toBe(50);
 });

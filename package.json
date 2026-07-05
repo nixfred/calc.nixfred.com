@@ -11,7 +11,8 @@
     "audit": "bun test tests/tokenops-math.test.js tests/nutanix-sizer.test.js && playwright test"
   },
   "dependencies": {
-    "astro": "^5.0.0"
+    "astro": "^5.0.0",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1"

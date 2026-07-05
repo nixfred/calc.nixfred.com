@@ -6,6 +6,7 @@ import { formulaTrace } from '../tokenops/components.js';
 import { sizerEngine, SIZER_DEFAULTS, PRESETS, RF, CVM, applyPreset } from './formulas.js';
 import { infoButton, openTeach } from '../tokenops/teach.js';
 import { SIZER_CATEGORIES, SIZER_PERSONAS, SIZER_SOURCE_LINKS } from './presets.js';
+import { importEstateFile } from './importer.js';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -73,9 +74,46 @@ export function createSizer(root, summaryEl) {
         <div class="pattern-grid">${cats}</div>
         <p class="section-label" style="margin-top:2.2rem">or walk in an example Customer's shoes</p>
         <div class="persona-row">${personas}</div>
+        <p class="section-label" style="margin-top:2.2rem">or drop a real inventory export${infoButton('sizer-import')}</p>
+        <label class="drop-target" id="ns-drop" for="ns-import-file">
+          <span class="drop-title">Nutanix Collector or RVTools .xlsx</span>
+          <span class="dim">Parsed right here in your browser. The file never leaves this machine, nothing uploads, nothing is stored.</span>
+          <span class="mono drop-cta"><span class="linklike-look">choose a file</span> or drag it onto this card</span>
+          <input type="file" id="ns-import-file" accept=".xlsx" hidden>
+        </label>
+        <p class="import-error mono" id="ns-import-error" hidden></p>
         <p class="dim start-skip">Prefer a blank sheet? <button class="linklike" data-goto="tool">Open every dial</button></p>
       </div>`;
     if (summaryEl) summaryEl.classList.add('hidden');
+  }
+
+  function applyImport(result, filename) {
+    state = { ...structuredClone(SIZER_DEFAULTS), ...result.patch };
+    landingMeta = {
+      title: `Imported: ${filename}`,
+      story: `Read ${result.included} powered-on VMs from a ${result.formatLabel} export (${result.provenance}). ${result.excludedTotal} rows excluded, itemized below. Every derived number is shown with its basis and stays adjustable. The file was parsed in this browser and never left this machine.`,
+      assumptions: result.notes,
+      variableNotes: [
+        { variable: 'vmCount', value: result.patch.vmCount, meaning: 'Powered-on VMs after exclusions (off, templates, not-for-sizing)', drives: 'CPU and RAM demand, and with them the node count' },
+        { variable: 'avgVcpuPerVm', value: result.patch.avgVcpuPerVm, meaning: 'Mean vCPUs across the counted VMs, from the file', drives: 'Core demand through the vCPU to pCPU ratio' },
+        { variable: 'avgRamGbPerVm', value: result.patch.avgRamGbPerVm, meaning: 'Mean RAM across the counted VMs, MiB from the file shown as GB (1024 MiB per GB)', drives: 'RAM demand, often the binding gate in real estates' },
+        { variable: 'usedStorageTb', value: result.patch.usedStorageTb, meaning: `From the file. Basis: ${result.storageBasis}. Decimal TB.`, drives: 'Storage demand after growth, RF, and data efficiency' },
+      ],
+    };
+    view = 'landing';
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  async function handleImportFile(file) {
+    if (!file) return;
+    const errEl = document.getElementById('ns-import-error');
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      applyImport(importEstateFile(bytes), file.name);
+    } catch (err) {
+      if (errEl) { errEl.hidden = false; errEl.textContent = `Import failed: ${err.message}`; }
+    }
   }
 
   function renderLanding() {
@@ -232,6 +270,27 @@ export function createSizer(root, summaryEl) {
       <div class="sum-cell"><span class="sum-label">effective TB/node</span><span class="sum-value mono">${fmt(values.effectiveTbPerNode)}</span></div>
       <div class="sum-cell"><span class="sum-label">storage demand</span><span class="sum-value mono">${fmt(values.storageDemandTb)} TB</span></div>`;
   }
+
+  root.addEventListener('change', (e) => {
+    if (e.target.id === 'ns-import-file') handleImportFile(e.target.files?.[0]);
+  });
+
+  root.addEventListener('dragover', (e) => {
+    const zone = e.target.closest?.('#ns-drop');
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.add('drag-on');
+  });
+  root.addEventListener('dragleave', (e) => {
+    e.target.closest?.('#ns-drop')?.classList.remove('drag-on');
+  });
+  root.addEventListener('drop', (e) => {
+    const zone = e.target.closest?.('#ns-drop');
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.remove('drag-on');
+    handleImportFile(e.dataTransfer?.files?.[0]);
+  });
 
   root.addEventListener('input', (e) => {
     const t = e.target;
