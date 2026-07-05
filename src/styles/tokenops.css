@@ -313,3 +313,12 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .teach-close:hover { color: var(--accent-soft); border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .teach-pop { animation: none; } }
 @media (max-width: 640px) { #teach-overlay { align-items: end; padding: 0; } .teach-pop { border-radius: 14px 14px 0 0; max-height: 88vh; } }
+
+/* ---------- estate file import (sizer front door) ---------- */
+
+.drop-target { display: flex; flex-direction: column; gap: 0.45rem; background: var(--surface); border: 1px dashed var(--border-bright); border-radius: 10px; padding: 1.2rem 1.3rem; cursor: pointer; margin-top: 0.6rem; transition: border-color 140ms ease; }
+.drop-target:hover, .drop-target.drag-on { border-color: var(--accent); }
+.drop-title { font-weight: 600; }
+.drop-cta { font-size: 0.8rem; color: var(--muted); }
+.linklike-look { color: var(--accent); }
+.import-error { color: #ff9d9d; margin-top: 0.7rem; }

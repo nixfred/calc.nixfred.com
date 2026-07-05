@@ -22,7 +22,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
-      - run: bun test tests/tokenops-math.test.js tests/nutanix-sizer.test.js
+      - run: bun test tests/tokenops-math.test.js tests/nutanix-sizer.test.js tests/nutanix-importer.test.js
       - run: bunx playwright install --with-deps chromium
       - run: bunx playwright test
 
