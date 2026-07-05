@@ -100,7 +100,10 @@ export function createApp(root, data) {
 
   const shared = X.parseShareLink();
   const auto = shared ? null : X.persistence.loadAutosave();
-  if (shared?.s) { state = { ...state, ...shared.s }; weightOverrides = shared.w ?? {}; view = 'architect'; }
+  let fromShare = false;
+  // A shared link should open on the ANSWER, not the sixteen-section Architect
+  // scroll. The meeting answer page is self-contained (recap plus recommendation).
+  if (shared?.s) { state = { ...state, ...shared.s }; weightOverrides = shared.w ?? {}; view = 'meeting'; meetingStep = MEETING_STEPS.length; fromShare = true; }
   else if (auto?.state) { state = { ...state, ...auto.state }; weightOverrides = auto.weightOverrides ?? {}; }
 
   /* ---------- compute ---------- */
@@ -125,7 +128,9 @@ export function createApp(root, data) {
       : 'Public list pricing may not match contract pricing.';
     const lever0 = primaryLeverOf(levers);
     if (lever0) rec.primaryLever = `${lever0.label} (saves about ${Math.round(lever0.savings).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} per month).`;
-    const fin = financeDecision(state, providerBaseline, ceiling);
+    // Pass the winning route so the finance banner reconciles with it instead
+    // of shouting GET A QUOTE next to a managed-route recommendation.
+    const fin = financeDecision(state, providerBaseline, ceiling, rec.kind === 'do-not-size' ? null : rec.top?.key);
     const disc = discoveryQuestions(state);
     const policy = privatePolicyScore(state, rules, weightOverrides);
     const hpeConfig = buildHpeConfig(state, values, ceiling, fin, hardware);
@@ -178,6 +183,28 @@ export function createApp(root, data) {
     return `<div class="card error-card">${errors.map((e) => `<p class="warn warn-${e.severity}"><span class="warn-tag">${e.severity}</span> ${esc(e.message)}</p>`).join('')}</div>`;
   }
 
+  // Plain sentences a seller can read aloud, instead of the scoring jargon in
+  // rulesFired ("Private policy score (55 pts * factor) added 27.5 points").
+  // The recommendation card keeps the full point math one card up.
+  function sayableWhy(rec) {
+    if (rec.kind === 'do-not-size') return rec.missing.slice(0, 3);
+    const SAY = {
+      direct: 'Speed to first value and model quality point to going straight to a provider.',
+      cloud: 'An existing cloud commitment and managed operations favor the cloud model service.',
+      airia: 'A governed agent-builder platform fits the integration and governance needs here.',
+      kamiwaza: 'Data restrictions push this work toward private, in-environment execution.',
+      btg: 'Readiness gaps and vendor selection favor a strategy and build partner first.',
+      hpePcai: 'Governance plus a hardware preference favor an integrated private AI platform.',
+      rentedGpu: 'High token pressure with no measured benchmark says rent and measure before buying.',
+      owned: 'Steady, high volume, around the clock usage is what owned hardware is for.',
+      hybrid: 'A mix of workloads and policies favors routing each task to the cheapest place it can run.',
+    };
+    const head = SAY[rec.top.key] ?? `${rec.top.label} scored highest on the weighted factors.`;
+    const extras = [...rec.top.components].filter((c) => c.points > 0).sort((a, b) => b.points - a.points).slice(0, 2)
+      .map((c) => c.label.replace(/\s*\([^)]*\)/g, '').trim());
+    return [head, ...extras];
+  }
+
   function resultsStack(cx, meeting = false) {
     const runs = cx.values.monthlyRuns ?? 0;
     const wb = C.whiteboardCard({
@@ -185,7 +212,7 @@ export function createApp(root, data) {
       monthlyRuns: runs,
       monthlyTokens: cx.values.totalMonthlyTokens ?? 0,
       route: cx.rec.kind === 'do-not-size' ? 'Do not size yet' : cx.rec.top.label,
-      why: cx.rec.rulesFired.slice(0, 3),
+      why: sayableWhy(cx.rec),
       breakEvenMTok: cx.be?.result,
       // Same basis as breakEvenTokens: the sentence must reproduce its own
       // arithmetic (audit finding). Budget is quote-derived when a quote exists.
@@ -198,7 +225,7 @@ export function createApp(root, data) {
       <p class="ceiling-headline mono">${money(cx.ceiling.ceilingCapex)}</p>
       <p>For on premises to make sense, the recommended configuration must come in under this number all-in (${money(cx.ceiling.ceilingMonthly)} per month over ${state.usefulLifeMonths} months). TokenOps does not price hardware. It tells you what the hardware has to cost.</p>
       <div class="quote-slot">
-        <label for="f-gpuQuote-inline">Enter a real quote (USD)</label>
+        <label for="f-gpuQuote-inline">Enter a real quote (USD, all-in: servers, storage, network, and services)${C.infoButton('gpuQuote')}</label>
         <input id="f-gpuQuote-inline" type="number" min="0" step="1000" data-field="gpuQuote" value="${state.gpuQuote ?? ''}">
         ${cx.ceiling.verdict ? (cx.ceiling.verdict.implausible
           ? `<p class="verdict over">That is not a real quote. Enter the actual all-in number (anything under ${money(cx.ceiling.verdict.floor)} here is a typo, not a deal).</p>`
@@ -214,13 +241,17 @@ export function createApp(root, data) {
       ${cx.rented ? C.formulaTrace(cx.rented, sources) : ''}
     </div>`;
     const parts = [
-      ...(meeting ? [C.inputsRecapCard(state)] : []),
+      // Answer first, always (site law: one sentence answer, details second).
+      // In meeting mode the recap follows the recommendation, it no longer
+      // buries the answer under a restatement of the inputs.
       C.recommendationCard(cx.rec, cx.conf, sources),
+      ...(meeting ? [C.inputsRecapCard(state)] : []),
       econ,
       C.hpeConfigCard(cx.hpeConfig, sources),
       C.optimizationCard(cx.levers),
       C.providerTable(cx.cmp, providerMeta, sources),
       wb,
+      C.scriptCard(cx, state),
       C.discoveryCard(cx.disc),
     ];
     if (!meeting) {
@@ -459,7 +490,13 @@ export function createApp(root, data) {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.teach) { openTeach(b.dataset.teach); return; }
-    if (b.dataset.pattern !== undefined) { startSel.pattern = b.dataset.pattern; render(); return; }
+    if (b.dataset.pattern !== undefined) {
+      startSel.pattern = b.dataset.pattern; render();
+      // On a phone the follow-up questions render below a tall single-column
+      // grid, so the tap looks like it did nothing. Bring them into view.
+      document.querySelector('.start-follow')?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      return;
+    }
     if (b.dataset.persona !== undefined) { applyPersonaFlow(Number(b.dataset.persona)); return; }
     if (b.id === 'start-go') { applyPatternFlow(); return; }
     if (b.dataset.navReset) {
