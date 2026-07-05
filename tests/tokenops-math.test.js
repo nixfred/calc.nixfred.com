@@ -344,6 +344,43 @@ test('finance decision: loan payment matches the standard amortization formula',
   expect(fin.verdict).toBe('buy');
 });
 
+test('finance and break even use ONE ownership payment (no card disagreement)', async () => {
+  const { financeDecision, hardwareCeiling, breakEvenTokens, ownershipMonthly, roleRoutedCost } = await import('../src/lib/tokenops/costs.js');
+  const s = { ...structuredClone(defaults), gpuQuote: 120000, financeMode: 'financed', financeAprPercent: 8, financeTermMonths: 24 };
+  const { values } = engine.evaluate(s, {});
+  const { total, billedTokens } = roleRoutedCost(s, values, rates);
+  const fin = financeDecision(s, 10000, hardwareCeiling(s, 10000));
+  const be = breakEvenTokens(s, values, 10000, billedTokens);
+  // Break even's monthly budget IS the finance payment, to the cent.
+  expect(be.monthlyBudget).toBeCloseTo(fin.payment, 6);
+  expect(fin.payment).toBeCloseTo(ownershipMonthly(s), 6);
+  // The substitution shows a real amortization formula, not placeholder text.
+  expect(fin.substitution).not.toContain('1.0)');
+  expect(fin.substitution).toMatch(/\[.*\] \/ \[.* - 1\]/);
+});
+
+test('servable share below 100 lowers the ceiling and states the hybrid remainder', async () => {
+  const { hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const full = hardwareCeiling(state, 10000);
+  const partial = hardwareCeiling({ ...state, servableSharePercent: 70 }, 10000);
+  expect(partial.ceilingMonthly).toBeCloseTo(10000 * 0.7 * 0.6, 6); // 4200
+  expect(partial.ceilingMonthly).toBeLessThan(full.ceilingMonthly);
+  const monthlyTrace = partial.traces.find((t) => t.id === 'hardwareCeilingMonthly');
+  expect(monthlyTrace.assumptions.some((a) => /hybrid/.test(a))).toBe(true);
+});
+
+test('cloud carries direct fit before policy AND pays its own lower policy penalty', () => {
+  const canLeave = { ...structuredClone(defaults), dataCanLeave: 'yes', needTimeToValue: 3, needQuality: 3 };
+  const cannot = { ...canLeave, dataCanLeave: 'no', dataSensitivity: 'high', regulatedData: true };
+  const { values } = engine.evaluate(canLeave, {});
+  const openCloud = scoreRoutes(canLeave, values, rules, { providerMonthlyCost: 5000 }, {}).routes.find((r) => r.key === 'cloud');
+  const lockedCloud = scoreRoutes(cannot, values, rules, { providerMonthlyCost: 5000 }, {}).routes.find((r) => r.key === 'cloud');
+  // Policy pressure now costs cloud points (it had none before), so a locked-
+  // down posture scores cloud lower than an open one.
+  expect(lockedCloud.penalties.some((p) => /policy pressure/i.test(p.label))).toBe(true);
+  expect(lockedCloud.raw).toBeLessThan(openCloud.raw);
+});
+
 test('a $1 quote is called a typo, not a deal (Fred UX catch)', async () => {
   const { hardwareCeiling, financeDecision } = await import('../src/lib/tokenops/costs.js');
   const s = { ...structuredClone(defaults), gpuQuote: 1 };

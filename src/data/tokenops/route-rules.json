@@ -111,6 +111,14 @@
           "min": 5,
           "max": 20
         }
+      },
+      "penalties": {
+        "privatePolicyFactor": {
+          "default": 0.4,
+          "min": 0.2,
+          "max": 0.6,
+          "note": "lower than direct 0.6: private endpoints, VNet injection, and residency regions mitigate but do not equal private execution"
+        }
       }
     },
     "airia": {
@@ -316,7 +324,21 @@
           "max": 10,
           "note": "high ops readiness reduces the need to rent first"
         }
-      }
+      },
+      "costPressureBands": [
+        {
+          "minMonthly": 50000,
+          "factor": 1.0
+        },
+        {
+          "minMonthly": 10000,
+          "factor": 0.6
+        },
+        {
+          "minMonthly": 2000,
+          "factor": 0.3
+        }
+      ]
     },
     "owned": {
       "label": "Owned private inference hardware",
@@ -392,11 +414,6 @@
           "min": 8,
           "max": 25,
           "note": "lowered from 15 per persona audit: hybrid crowded co-recommendations"
-        },
-        "routeFlexibility": {
-          "default": 5,
-          "min": 2,
-          "max": 8
         }
       }
     }

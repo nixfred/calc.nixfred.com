@@ -231,5 +231,6 @@
   "quickInputSharePercent": 70,
   "financeMode": "cash",
   "financeTermMonths": 36,
-  "financeAprPercent": 8
+  "financeAprPercent": 8,
+  "cacheWriteSharePercent": 0
 }
