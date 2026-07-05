@@ -10,6 +10,7 @@ export const SIZER_CATEGORIES = {
     label: 'General server virtualization',
     tagline: 'The classic estate: mixed application VMs, often a VMware exit.',
     howCommon: 'The bread-and-butter Nutanix conversation; the guide’s default sizing case.',
+    commonShort: 'The guide default sizing case',
     patch: { workloadType: 'general', vcpuToPcpu: 4, compressionRatio: 1.75, dedupRatio: 1.0, cvmProfile: 'standard', rf: 'rf2', vmCount: 200, avgVcpuPerVm: 4, avgRamGbPerVm: 16, usedStorageTb: 50, growthPercentPerYear: 20, growthWindowMonths: 24 },
     assumptions: [
       { field: 'vcpuToPcpu', label: '4:1 vCPU to core ratio', why: 'Field heuristic for mixed server workloads; the guide publishes no ratio on purpose.', verify: true },
@@ -22,6 +23,7 @@ export const SIZER_CATEGORIES = {
     label: 'VDI and end user computing',
     tagline: 'Desktops at density: task workers to power users.',
     howCommon: 'Guide gives hard density bands: task worker 120 to 180 per node, knowledge worker 80 to 120, power user 50 to 80.',
+    commonShort: 'Task worker 120 to 180 desktops per node',
     patch: { workloadType: 'vdi', vcpuToPcpu: 4, compressionRatio: 1.75, dedupRatio: 3.0, cvmProfile: 'heavy', rf: 'rf2', vmCount: 500, avgVcpuPerVm: 2, avgRamGbPerVm: 8, usedStorageTb: 30, growthPercentPerYear: 10, growthWindowMonths: 24 },
     assumptions: [
       { field: 'dedupRatio', label: '3x dedup', why: 'Non-persistent VDI dedups 3 to 5x per the guide; 3 is the conservative end. Persistent profiles dedup less.', verify: true },
@@ -33,6 +35,7 @@ export const SIZER_CATEGORIES = {
     label: 'Business critical databases',
     tagline: 'SQL, Oracle, and the workloads that get people fired.',
     howCommon: 'Guide: all-NVMe non-negotiable, p99 under 2 to 3 ms, dedicated clusters past 50 TB of DB.',
+    commonShort: 'All-NVMe, p99 under 2 to 3 ms',
     patch: { workloadType: 'database', vcpuToPcpu: 2, compressionRatio: 1.5, dedupRatio: 1.0, cvmProfile: 'heavy', rf: 'rf2', vmCount: 40, avgVcpuPerVm: 8, avgRamGbPerVm: 48, usedStorageTb: 25, growthPercentPerYear: 25, growthWindowMonths: 24 },
     assumptions: [
       { field: 'vcpuToPcpu', label: '2:1 ratio for databases', why: 'Fred’s field heuristic; databases do not tolerate CPU contention.', verify: true },
@@ -44,6 +47,7 @@ export const SIZER_CATEGORIES = {
     label: 'Files (NAS consolidation)',
     tagline: 'SMB and NFS shares on the cluster instead of a filer.',
     howCommon: 'Guide bands: 3 FSVMs to 50 TB, 3 to 5 FSVMs to 200 TB, 5+ beyond; plan 20 percent overhead for snapshots and metadata.',
+    commonShort: '3 FSVMs to 50 TB, 20 percent snapshot overhead',
     patch: { workloadType: 'general', vcpuToPcpu: 4, compressionRatio: 1.5, dedupRatio: 1.0, cvmProfile: 'standard', rf: 'rf2', vmCount: 12, avgVcpuPerVm: 4, avgRamGbPerVm: 16, usedStorageTb: 120, growthPercentPerYear: 25, growthWindowMonths: 24 },
     assumptions: [
       { field: 'usedStorageTb', label: 'Storage is the gate here', why: 'Files clusters bind on capacity, not CPU. The VM count models the FSVMs plus utility machines.', verify: true },
@@ -54,6 +58,7 @@ export const SIZER_CATEGORIES = {
     label: 'Objects (S3 on cluster)',
     tagline: 'Object storage for backups, data lakes, and app buckets.',
     howCommon: 'Guide: minimum 3 Object Service VMs for HA; cold data is the natural erasure coding case.',
+    commonShort: 'EC-X natural case for cold data',
     patch: { workloadType: 'general', vcpuToPcpu: 4, compressionRatio: 1.2, dedupRatio: 1.0, cvmProfile: 'standard', rf: 'ecx41', vmCount: 8, avgVcpuPerVm: 4, avgRamGbPerVm: 16, usedStorageTb: 250, growthPercentPerYear: 30, growthWindowMonths: 24 },
     assumptions: [
       { field: 'rf', label: 'EC-X 4+1 instead of RF2', why: 'Cold object data earns erasure coding: 80 percent usable versus 50, at a 6 node minimum (TN-2032 corrected).', verify: true },
@@ -64,6 +69,7 @@ export const SIZER_CATEGORIES = {
     label: 'Kubernetes and cloud native',
     tagline: 'Worker nodes for containerized platforms.',
     howCommon: 'Guide: 3 to 5 workers for small clusters, scaling to 100+; add 20 to 30 percent for Kubernetes overhead.',
+    commonShort: '3 to 5 workers, add 20 to 30 percent overhead',
     patch: { workloadType: 'general', vcpuToPcpu: 4, compressionRatio: 1.5, dedupRatio: 1.0, cvmProfile: 'standard', rf: 'rf2', vmCount: 24, avgVcpuPerVm: 4, avgRamGbPerVm: 16, usedStorageTb: 20, growthPercentPerYear: 30, growthWindowMonths: 18 },
     assumptions: [
       { field: 'growthPercentPerYear', label: '30 percent growth, 18 month window', why: 'Container platforms sprawl; the guide overhead rule (20 to 30 percent) is baked into the VM sizing here.', verify: true },
@@ -73,6 +79,7 @@ export const SIZER_CATEGORIES = {
     label: 'ROBO and edge sites',
     tagline: 'Small sites, small clusters, sometimes one or two nodes.',
     howCommon: 'Guide: 1 and 2 node clusters are supported with specific licensing and feature limits; 3 nodes is the production floor elsewhere.',
+    commonShort: '1 and 2 node clusters supported at the edge',
     patch: { workloadType: 'general', vcpuToPcpu: 4, compressionRatio: 1.75, dedupRatio: 1.0, cvmProfile: 'light', rf: 'rf2', vmCount: 25, avgVcpuPerVm: 2, avgRamGbPerVm: 8, usedStorageTb: 8, growthPercentPerYear: 10, growthWindowMonths: 24, nodeCores: 16, nodeRamGb: 384, nodeRawTb: 15.36 },
     assumptions: [
       { field: 'nodeCores', label: 'Smaller node profile', why: 'Edge boxes run 16 core / 384 GB class hardware, not datacenter monsters.', verify: true },
@@ -83,6 +90,7 @@ export const SIZER_CATEGORIES = {
     label: 'DR target cluster',
     tagline: 'The other site: sized against the primary, not from scratch.',
     howCommon: 'Guide: warm DR runs 50 to 100 percent of primary, the working rule is 60 to 80 percent for steady-state DR.',
+    commonShort: 'Warm DR runs 60 to 80 percent of primary',
     patch: { workloadType: 'general', vcpuToPcpu: 5, compressionRatio: 1.75, dedupRatio: 1.0, cvmProfile: 'standard', rf: 'rf2', vmCount: 140, avgVcpuPerVm: 4, avgRamGbPerVm: 16, usedStorageTb: 50, growthPercentPerYear: 15, growthWindowMonths: 24, usagePattern: 'steady' },
     assumptions: [
       { field: 'vmCount', label: 'Enter about 70 percent of the primary estate', why: 'The guide’s 60 to 80 percent DR sizing rule; failover does not need day-one full performance for every tier.', verify: true },
@@ -93,6 +101,7 @@ export const SIZER_CATEGORIES = {
     label: 'Backup repository',
     tagline: 'Storage-heavy target for backup workloads.',
     howCommon: 'Guide: storage-only and storage-heavy nodes are full cluster citizens; backup data is the EC-X 4+2 natural case.',
+    commonShort: 'EC-X 4+2 natural case, storage-heavy nodes',
     patch: { workloadType: 'general', vcpuToPcpu: 6, compressionRatio: 1.2, dedupRatio: 1.0, cvmProfile: 'standard', rf: 'ecx42', vmCount: 6, avgVcpuPerVm: 4, avgRamGbPerVm: 16, usedStorageTb: 400, growthPercentPerYear: 25, growthWindowMonths: 24 },
     assumptions: [
       { field: 'rf', label: 'EC-X 4+2', why: 'Two-failure tolerance on cold data at 67 percent usable, 7 node minimum. Backup data compresses and dedups poorly (already processed upstream).', verify: true },

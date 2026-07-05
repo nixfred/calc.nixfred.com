@@ -6,7 +6,7 @@ import { formulaTrace } from '../tokenops/components.js';
 import { sizerEngine, SIZER_DEFAULTS, PRESETS, RF, CVM, applyPreset } from './formulas.js';
 import { infoButton, openTeach } from '../tokenops/teach.js';
 import { SIZER_CATEGORIES, SIZER_PERSONAS, SIZER_SOURCE_LINKS } from './presets.js';
-import { importEstateFile } from './importer.js';
+import { importEstateFile, scopeResult } from './importer.js';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -23,6 +23,8 @@ export function createSizer(root, summaryEl) {
   let view = 'start';
   let landingMeta = null;
   let startCat = null;
+  let importRaw = null;
+  let importFilename = '';
 
   const navPills = () => `<nav class="app-nav mono" aria-label="Calculator navigation">
     <button type="button" class="nav-item ${view === 'start' ? 'on' : ''}" data-goto="start">Start</button>
@@ -59,7 +61,7 @@ export function createSizer(root, summaryEl) {
       <button type="button" class="pattern-card ${startCat === k ? 'on' : ''}" data-cat="${k}">
         <span class="pc-label">${esc(c.label)}</span>
         <span class="pc-tag dim">${esc(c.tagline)}</span>
-        <span class="pc-common mono">${esc(c.howCommon.split(';')[0].split(':')[0])}</span>
+        <span class="pc-common mono">${esc(c.commonShort ?? c.howCommon.split(';')[0].split(':')[0])}</span>
       </button>`).join('');
     const personas = SIZER_PERSONAS.map((p, i) => `
       <button type="button" class="persona-card" data-spersona="${i}">
@@ -87,22 +89,28 @@ export function createSizer(root, summaryEl) {
     if (summaryEl) summaryEl.classList.add('hidden');
   }
 
-  function applyImport(result, filename) {
+  function applyImport(result, filename, keepScroll) {
     state = { ...structuredClone(SIZER_DEFAULTS), ...result.patch };
+    const clusterLine = result.clusters?.length > 1
+      ? ` This file spans ${result.clusters.length} clusters; you are viewing ${result.activeCluster ?? 'all of them combined'}. Pick one below if you are sizing a single cluster.`
+      : '';
     landingMeta = {
       title: `Imported: ${filename}`,
-      story: `Read ${result.included} powered-on VMs from a ${result.formatLabel} export (${result.provenance}). ${result.excludedTotal} rows excluded, itemized below. Every derived number is shown with its basis and stays adjustable. The file was parsed in this browser and never left this machine.`,
+      story: `Read ${result.included} powered-on VMs from a ${result.formatLabel} export (${result.provenance}). ${result.excludedTotal} rows excluded, itemized below.${clusterLine} Every derived number is shown with its basis and stays adjustable. The file was parsed in this browser and never left this machine.`,
+      clusters: result.clusters,
+      activeCluster: result.activeCluster,
       assumptions: result.notes,
       variableNotes: [
         { variable: 'vmCount', value: result.patch.vmCount, meaning: 'Powered-on VMs after exclusions (off, templates, not-for-sizing)', drives: 'CPU and RAM demand, and with them the node count' },
         { variable: 'avgVcpuPerVm', value: result.patch.avgVcpuPerVm, meaning: 'Mean vCPUs across the counted VMs, from the file', drives: 'Core demand through the vCPU to pCPU ratio' },
         { variable: 'avgRamGbPerVm', value: result.patch.avgRamGbPerVm, meaning: 'Mean RAM across the counted VMs, MiB from the file shown as GB (1024 MiB per GB)', drives: 'RAM demand, often the binding gate in real estates' },
-        { variable: 'usedStorageTb', value: result.patch.usedStorageTb, meaning: `From the file. Basis: ${result.storageBasis}. Decimal TB.`, drives: 'Storage demand after growth, RF, and data efficiency' },
+        { variable: 'largestVmRamGb', value: result.patch.largestVmRamGb, meaning: 'The single biggest VM by RAM, from the file', drives: 'Must fit inside one node after the CVM tax; can force a larger node profile than the averages suggest' },
+        { variable: 'usedStorageTb', value: result.patch.usedStorageTb, meaning: `From the file. Basis: ${result.storageBasis}. Decimal TB.${result.provisionedTb > 0 ? ` Provisioned was ${result.provisionedTb} TB.` : ''}`, drives: 'Storage demand after growth, RF, and data efficiency' },
       ],
     };
     view = 'landing';
     render();
-    window.scrollTo(0, 0);
+    if (!keepScroll) window.scrollTo(0, 0);
   }
 
   async function handleImportFile(file) {
@@ -110,10 +118,18 @@ export function createSizer(root, summaryEl) {
     const errEl = document.getElementById('ns-import-error');
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      applyImport(importEstateFile(bytes), file.name);
+      const result = importEstateFile(bytes);
+      importRaw = result.raw;
+      importFilename = file.name;
+      applyImport(result, file.name);
     } catch (err) {
       if (errEl) { errEl.hidden = false; errEl.textContent = `Import failed: ${err.message}`; }
     }
+  }
+
+  function rescopeImport(clusterName) {
+    if (!importRaw) return;
+    applyImport(scopeResult(importRaw, clusterName), importFilename, true);
   }
 
   function renderLanding() {
@@ -122,7 +138,7 @@ export function createSizer(root, summaryEl) {
       <tr class="${a.verify ? 'verify-row' : ''}">
         <td>${a.verify ? '<span class="verify-flag mono">VERIFY</span>' : ''}</td>
         <td><b>${esc(a.label)}</b><br><span class="dim">${esc(a.why)}</span></td>
-        <td><button class="linklike" data-goto="tool">adjust</button></td>
+        <td>${a.field ? `<button class="linklike" data-focus="ns-${esc(a.field)}">adjust</button>` : '<button class="linklike" data-goto="tool">adjust</button>'}</td>
       </tr>`).join('');
     const notes = landingMeta.variableNotes?.length ? `
       <details class="weight-group" open><summary>Every number, explained: what it means and what it drives</summary>
@@ -136,6 +152,14 @@ export function createSizer(root, summaryEl) {
         ${landingMeta.story ? `<p class="landing-story">${esc(landingMeta.story)}</p>` : `<p class="dim">${esc(landingMeta.tagline ?? '')}</p>`}
         ${landingMeta.howCommon ? `<p class="dim"><span class="k">from the field guide</span> ${esc(landingMeta.howCommon)}</p>` : ''}
         ${landingMeta.groundedIn ? `<p class="dim"><span class="k">grounded in</span> ${esc(landingMeta.groundedIn)} <a href="${SIZER_SOURCE_LINKS.arch}" target="_blank" rel="noopener">(source)</a></p>` : ''}
+        ${landingMeta.clusters?.length > 1 ? `<div class="card cluster-picker">
+          <h3 class="card-title">Which cluster are you sizing?</h3>
+          <p class="dim">This export covers ${landingMeta.clusters.length} clusters. Sizing conversations are per cluster; the file is per vCenter.</p>
+          <select id="ns-cluster-scope" data-cluster-scope>
+            <option value="__all__" ${landingMeta.activeCluster == null ? 'selected' : ''}>All ${landingMeta.clusters.length} clusters combined</option>
+            ${landingMeta.clusters.map((c) => `<option value="${esc(c.name)}" ${landingMeta.activeCluster === c.name ? 'selected' : ''}>${esc(c.name)} (${c.vms} VMs)</option>`).join('')}
+          </select>
+        </div>` : ''}
         <div class="card">
           <h3 class="card-title">What we just assumed for you</h3>
           <p class="dim">Starting points from the guide, not truths. The flagged rows are the ones to verify with the Customer.</p>
@@ -170,16 +194,41 @@ export function createSizer(root, summaryEl) {
     return sizerEngine.evaluate(state, {});
   }
 
+  // Headroom and honesty knobs: govern every node count, guide discipline
+  // in the sub-label. Adjust only with a reason. [key, label, sub, max]
+  const HEADROOM = [
+    ['reservationPercent', 'Capacity reservation percent', 'guide 10 to 15 percent, worked example uses 12', 100],
+    ['storageCeiling', 'Storage utilization ceiling', 'guide: never plan past 0.75 at peak', 1],
+    ['cpuCeiling', 'CPU utilization ceiling', 'guide: 0.70 at peak', 1],
+    ['ramCeiling', 'RAM utilization ceiling', 'guide: 0.75 to 0.85, 0.80 used', 1],
+    ['rangePlusPercent', 'Honest range band percent', 'guide: within roughly 25 percent', 100],
+  ];
+  const ESTATE_DETAIL = [
+    ['largestVmVcpu', 'Largest VM vCPU (0 if unknown)', 'the biggest VM sizes the node; averages size the cluster'],
+    ['largestVmRamGb', 'Largest VM RAM GB (0 if unknown)', 'checked against usable RAM per node after the CVM tax'],
+  ];
+
   function inputsHtml() {
     const sel = (key, label, entries, cur) => `<div class="field"><label for="ns-${key}">${label}${infoButton('sizer-' + key)}</label>
       <select id="ns-${key}" data-ns="${key}">${entries.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
+    const numField = (key, label, sub, max) => `<div class="field"><label for="ns-${key}">${label}${infoButton('sizer-' + key)}</label><input id="ns-${key}" type="number" step="any" min="0"${max ? ` max="${max}"` : ''} data-ns="${key}" value="${state[key]}">${sub ? `<span class="field-sub dim mono">${esc(sub)}</span>` : ''}</div>`;
+    const isEcx = state.rf === 'ecx41' || state.rf === 'ecx42';
+    const coldField = isEcx ? numField('coldDataPercent', 'Cold data percent (EC-X only)', 'EC-X encodes write-cold data only; hot stays RF2', 100) : '';
     return `
       <div class="a-fields">
         ${sel('workloadType', 'Workload preset', Object.entries(PRESETS).map(([k, p]) => [k, p.label]), state.workloadType)}
         ${sel('rf', 'Data protection', Object.entries(RF).map(([k, r]) => [k, r.label]), state.rf)}
         ${sel('cvmProfile', 'CVM profile', Object.entries(CVM).map(([k, c]) => [k, `${c.label} (${c.vcpu} vCPU / ${c.ramGb} GB)`]), state.cvmProfile)}
-        ${F.map(([key, label]) => `<div class="field"><label for="ns-${key}">${label}${infoButton('sizer-' + key)}</label><input id="ns-${key}" type="number" step="any" min="0" data-ns="${key}" value="${state[key]}"></div>`).join('')}
-      </div>`;
+        ${F.map(([key, label]) => numField(key, label)).join('')}
+      </div>
+      <details class="weight-group headroom-block">
+        <summary>Headroom and honesty (guide discipline, adjust only with a reason)</summary>
+        <div class="a-fields">
+          ${HEADROOM.map(([key, label, sub, max]) => numField(key, label, sub, max)).join('')}
+          ${coldField}
+          ${ESTATE_DETAIL.map(([key, label, sub]) => numField(key, label, sub)).join('')}
+        </div>
+      </details>`;
   }
 
   function resultsHtml() {
@@ -189,21 +238,44 @@ export function createSizer(root, summaryEl) {
     const gates = { CPU: values.nodesByCpu, RAM: values.nodesByRam, storage: values.nodesByStorage };
     const winner = Object.entries(gates).sort((a, b) => b[1] - a[1])[0][0];
     const answer = `This estate fits in roughly ${floor} to ${ceil} nodes (HPE ProLiant for Nutanix) (${state.nodeCores} cores / ${fmt(state.nodeRamGb)} GB / ${state.nodeRawTb} TB raw each) at ${rf.label}.`;
+    // The lever that actually moves the binding gate, named so the user knows
+    // which dial to challenge with the Customer. Links focus the input.
+    const leverByGate = {
+      RAM: { primary: 'avgRamGbPerVm', alt: 'nodeRamGb', text: 'verify average RAM per VM with real per-VM actuals, or raise RAM per node' },
+      CPU: { primary: 'vcpuToPcpu', alt: 'nodeCores', text: 'verify the vCPU to pCPU overcommit ratio, or raise cores per node' },
+      storage: { primary: 'compressionRatio', alt: 'nodeRawTb', text: 'verify the compression ratio against real data, or raise raw TB per node' },
+    };
+    const lever = leverByGate[winner];
+    const gateLine = `CPU needs ${gates.CPU} node${gates.CPU === 1 ? '' : 's'}, RAM needs ${gates.RAM}, storage needs ${gates.storage}. ${winner === 'storage' ? 'Storage' : winner} wins.`;
+    const leverHtml = lever
+      ? `Biggest lever: <button class="linklike" data-focus="ns-${lever.primary}">${lever.primary}</button> or <button class="linklike" data-focus="ns-${lever.alt}">${lever.alt}</button>. ${esc(lever.text)}.`
+      : '';
 
     const wbText = [
       `Estate: ${fmt(state.vmCount)} VMs, ${fmt(values.storageDemandTb)} TB after ${state.growthWindowMonths} months growth`,
       `Rough size: ${floor} to ${ceil} nodes (HPE ProLiant for Nutanix) at ${rf.label} (binding gate: ${winner})`,
-      `Effective per node: ${fmt(values.effectiveTbPerNode)} TB after RF, reservation, 75 percent ceiling, and data efficiency`,
+      `Gates: CPU ${values.nodesByCpu} / RAM ${values.nodesByRam} / storage ${values.nodesByStorage}; largest + ${rf.failureReserve} failure reserve = ${floor} floor; + ${state.rangePlusPercent} percent band = ${ceil}`,
+      `Effective per node: ${fmt(values.effectiveTbPerNode)} TB after RF, reservation, ${fmt(state.storageCeiling * 100)} percent ceiling, and data efficiency`,
       `CVM tax paid: ${cvm.vcpu} vCPU + ${cvm.ramGb} GB per node`,
       `This is a pre-sizer estimate, within roughly 25 percent. Nutanix Sizer produces the number that goes in the contract.`,
     ];
 
+    // Data protection line keyed by the actual selection, so an EC-X estate
+    // never hears the RF2 speech. Numbers match the RF table and usableMultiplier trace.
+    const rfScript = {
+      rf2: `On RF2: "RF2 with N+1 tolerates a node failure while keeping your data protected. RF3 exists for the workloads where two simultaneous failures must be survivable, and storing that third copy needs about 50 percent more raw capacity for the same data."`,
+      rf3: `On RF3: "RF3 needs about 50 percent more raw capacity than RF2 for the same data, because it stores a third full copy. Before we pay that, what are the actual RTO and RPO requirements, and what does the backup layer already cover?"`,
+      ecx41: `On EC-X 4+1: "Erasure coding 4+1 gives 80 percent usable versus 50 for RF2, earned on write-cold data at a 6 node minimum, and rebuilds cost more CPU during a failure. Hot data stays at RF2 until it cools, so the usable number on screen blends the two."`,
+      ecx42: `On EC-X 4+2: "Erasure coding 4+2 gives 67 percent usable and tolerates two simultaneous failures at a 7 node minimum. Like 4+1 it encodes write-cold data only; hot data stays at RF2 until it cools."`,
+    };
+    const cpuPct = fmt(state.cpuCeiling * 100), storPct = fmt(state.storageCeiling * 100), ramPct = fmt(state.ramCeiling * 100);
     const script = [
+      `On the node count: "The ${winner} gate alone needs ${gates[winner]} nodes. We add ${rf.failureReserve} so a node failure or a maintenance window does not drop you below capacity, and the top of the range carries the ${state.rangePlusPercent} percent accuracy band rough math deserves. Every step is on this screen."`,
       `On the range: "Rough math says ${floor} to ${ceil} nodes. A single number this early would imply precision nobody has yet. Sizer with your real workload data produces the committed number."`,
-      `On ${rf.label}: ${state.rf === 'rf3' ? '"RF3 needs about 50 percent more raw capacity than RF2 for the same data, because it stores a third full copy. Before we pay that, what are the actual RTO and RPO requirements, and what does the backup layer already cover?"' : '"RF2 with N+1 tolerates a node failure while keeping your data protected. RF3 exists for the workloads where two simultaneous failures must be survivable, and storing that third copy needs about 50 percent more raw capacity for the same data."'}`,
+      rfScript[state.rf] ?? rfScript.rf2,
       `On the CVM: "Every node reserves about ${cvm.vcpu} vCPUs and ${cvm.ramGb} GB for the storage controller. That is the honest overhead of hyperconvergence, and it is already subtracted in these numbers."`,
       `On data efficiency: "I planned ${state.compressionRatio}x compression${state.dedupRatio > 1 ? ` and ${state.dedupRatio}x dedup` : ''}. Anything better is a bonus. Nobody should quote you 4 to 6x without seeing your data."`,
-      `On headroom: "These numbers keep CPU at 70 percent and storage at 75 percent at peak. A cluster sized to 100 percent has no room for a rebuild, a spike, or next quarter."`,
+      `On headroom: "These numbers keep CPU at ${cpuPct} percent, RAM at ${ramPct} percent, and storage at ${storPct} percent at peak. A cluster sized to 100 percent has no room for a rebuild, a spike, or next quarter."`,
     ];
 
     const next = [
@@ -216,7 +288,9 @@ export function createSizer(root, summaryEl) {
     return `
       <div class="card"><h3 class="card-title">The answer</h3>
         <p class="rec-headline">${esc(answer)}</p>
-        <p class="dim">Binding gate: ${winner}. Pre-sizer estimate, within roughly 25 percent. Never a quote; Nutanix Sizer is the source of truth.</p>
+        <p class="gate-defense mono">${esc(gateLine)} The floor already includes the ${rf.failureReserve} node failure reserve.</p>
+        <p class="dim">${leverHtml}</p>
+        <p class="dim scope-note">Capacity sizing only. This does not check storage performance, and a heavy IOPS tier can need more nodes or all NVMe regardless of these numbers. Collect peak IOPS and the read write split before the Sizer meeting. Pre-sizer estimate, within roughly 25 percent. Never a quote; Nutanix Sizer is the source of truth.</p>
       </div>
       <div class="card" id="dx-config-card">
         <h3 class="card-title">The iron (all HPE, no prices)</h3>
@@ -273,6 +347,7 @@ export function createSizer(root, summaryEl) {
 
   root.addEventListener('change', (e) => {
     if (e.target.id === 'ns-import-file') handleImportFile(e.target.files?.[0]);
+    if (e.target.dataset.clusterScope !== undefined) rescopeImport(e.target.value === '__all__' ? null : e.target.value);
   });
 
   root.addEventListener('dragover', (e) => {
@@ -309,6 +384,21 @@ export function createSizer(root, summaryEl) {
     if (b?.dataset.teach) { openTeach(b.dataset.teach); return; }
     if (b?.dataset.cat) { startCat = b.dataset.cat; applyCategory(b.dataset.cat); return; }
     if (b?.dataset.spersona !== undefined && b?.dataset.spersona !== null && b.dataset.spersona !== '') { applyPersona(Number(b.dataset.spersona)); return; }
+    if (b?.dataset.focus) {
+      const id = b.dataset.focus;
+      if (view !== 'tool') { view = 'tool'; render(); }
+      const el = document.getElementById(id);
+      if (el) {
+        // Open the collapsed headroom block if the target lives inside it.
+        el.closest('details')?.setAttribute('open', '');
+        el.scrollIntoView({ block: 'center', behavior: 'auto' });
+        el.focus();
+        if (el.select) el.select();
+        el.classList.add('field-flash');
+        setTimeout(() => el.classList.remove('field-flash'), 1200);
+      }
+      return;
+    }
     if (b?.dataset.goto) {
       const g = b.dataset.goto;
       if (g === 'tool-answer') { view = 'tool'; render(); document.getElementById('ns-results')?.scrollIntoView(); return; }
@@ -317,6 +407,7 @@ export function createSizer(root, summaryEl) {
     if (b?.dataset.nsReset) {
       state = structuredClone(SIZER_DEFAULTS);
       landingMeta = null; startCat = null; view = 'start';
+      importRaw = null; importFilename = '';
       history.replaceState(null, '', location.pathname);
       render();
       window.scrollTo(0, 0);

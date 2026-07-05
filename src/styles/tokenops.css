@@ -322,3 +322,14 @@ button.linklike { background: none; border: none; color: var(--accent); padding:
 .drop-cta { font-size: 0.8rem; color: var(--muted); }
 .linklike-look { color: var(--accent); }
 .import-error { color: #ff9d9d; margin-top: 0.7rem; }
+
+/* ---------- point release: sizer answer defense + headroom ---------- */
+
+.gate-defense { font-size: 0.86rem; color: var(--text); background: var(--surface-2); border-left: 2px solid var(--accent); padding: 0.5rem 0.7rem; border-radius: 0 6px 6px 0; margin: 0.5rem 0; }
+.scope-note { font-size: 0.8rem; margin-top: 0.5rem; }
+.field-sub { display: block; font-size: 0.68rem; margin-top: 0.2rem; line-height: 1.3; }
+.headroom-block { margin-top: 1rem; }
+.headroom-block > summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0.3rem 0; }
+.field-flash { animation: fieldFlash 1.2s ease; }
+@keyframes fieldFlash { 0%, 100% { box-shadow: none; } 20%, 60% { box-shadow: 0 0 0 2px var(--accent); } }
+@media (prefers-reduced-motion: reduce) { .field-flash { animation: none; outline: 2px solid var(--accent); } }

@@ -52,7 +52,7 @@ test('navigation: no dead ends across start, landing, answer, every dial', async
 
 test('sizer computes and shows all four outputs (tool view)', async ({ page }) => {
   await openTool(page);
-  await expect(page.locator('#sizer-root .a-fields')).toBeVisible();
+  await expect(page.locator('#sizer-root .a-fields').first()).toBeVisible();
   await expect(page.locator('.rec-headline')).toContainText(/fits in roughly \d+ to \d+ nodes \(HPE ProLiant for Nutanix\)/);
   await expect(page.locator('.wb-card')).toBeVisible();
   await expect(page.locator('.card-title', { hasText: 'Conversation script' })).toBeVisible();
@@ -89,6 +89,7 @@ test('database preset applies the 2:1 field ratio', async ({ page }) => {
 
 test('Start over wipes the ENTIRE surface from any view and returns to start', async ({ page }) => {
   await openTool(page);
+  await page.evaluate(() => document.querySelectorAll('details.headroom-block').forEach((d) => d.setAttribute('open', '')));
   await page.evaluate(() => { location.hash = '#ns-formulas'; });
   const fields = await page.evaluate(() => [...document.querySelectorAll('input[data-ns]')].map((i) => i.dataset.ns));
   for (const f of fields) await page.fill(`input[data-ns="${f}"]`, '7');
@@ -111,9 +112,11 @@ test('Start over wipes the ENTIRE surface from any view and returns to start', a
 
 test('teach layer: EVERY sizer input has a working four-section popover', async ({ page }) => {
   await openTool(page);
+  // Open the collapsed headroom block so its inputs are interactive.
+  await page.evaluate(() => document.querySelectorAll('details.headroom-block').forEach((d) => d.setAttribute('open', '')));
   const inputs = await page.evaluate(() => [...document.querySelectorAll('[data-ns]')].map((el) => el.dataset.ns));
-  expect(inputs.length).toBe(15);
-  expect(await page.locator('.info-btn').count()).toBe(15);
+  expect(inputs.length).toBe(22);
+  expect(await page.locator('.info-btn').count()).toBe(22);
   for (const key of inputs) {
     await page.locator(`.info-btn[data-teach="sizer-${key}"]`).click();
     const pop = page.locator('.teach-pop');
@@ -122,6 +125,29 @@ test('teach layer: EVERY sizer input has a working four-section popover', async 
     await page.keyboard.press('Escape');
   }
   await expect(page.locator('#teach-overlay')).toHaveCount(0);
+});
+
+test('answer card defends the binding gate with all three counts and a lever', async ({ page }) => {
+  await openTool(page);
+  const gd = page.locator('.gate-defense');
+  await expect(gd).toContainText(/CPU needs \d+ node/);
+  await expect(gd).toContainText(/RAM needs \d+/);
+  await expect(gd).toContainText(/storage needs \d+/);
+  await expect(gd).toContainText(/failure reserve/);
+  await expect(page.locator('.scope-note')).toContainText('does not check storage performance');
+  // The lever link focuses the specific input.
+  const lever = page.locator('.card .linklike[data-focus]').first();
+  const target = await lever.getAttribute('data-focus');
+  await lever.click();
+  await expect(page.locator(`#${target}`)).toBeFocused();
+});
+
+test('EC-X selection produces an EC-X script line, never the RF2 speech', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await page.locator('.pattern-card[data-cat="backup-repo"]').click();
+  await page.locator('button.primary[data-goto="tool-answer"]').click();
+  await expect(page.locator('.card', { hasText: 'Conversation script' })).toContainText('EC-X 4+2');
+  await expect(page.locator('.card', { hasText: 'Conversation script' })).not.toContainText('RF2 with N+1 tolerates');
 });
 
 /* ---------- estate file import (Collector + RVTools) ---------- */
@@ -153,6 +179,20 @@ test('import: Collector file lands on a provenance-first starting point', async 
   expect(s.usedStorageTb).toBe(9.0);
   await page.locator('button.primary[data-goto="tool-answer"]').click();
   await expect(page.locator('.rec-headline')).toContainText(/fits in roughly \d+ to \d+ nodes/);
+});
+
+test('import: multi-cluster file offers a cluster scope selector', async ({ page }) => {
+  await page.goto('/nutanix-sizer/');
+  await page.setInputFiles('#ns-import-file', {
+    name: 'vcenter-all.xlsx', mimeType: XLSX_MIME, buffer: Buffer.from(collectorFixture()),
+  });
+  await expect(page.locator('.cluster-picker')).toBeVisible();
+  await expect(page.locator('.landing-story')).toContainText('spans 2 clusters');
+  // Scope down to ClusterB (one VM) and the estate re-derives.
+  await page.selectOption('#ns-cluster-scope', 'ClusterB');
+  const s = await page.evaluate(() => window.__sizer.getState());
+  expect(s.vmCount).toBe(1);
+  expect(s.avgVcpuPerVm).toBe(16);
 });
 
 test('import: RVTools file derives the estate with In Use basis', async ({ page }) => {
