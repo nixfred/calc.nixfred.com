@@ -73,6 +73,47 @@ test('growth compounds correctly: 20 percent over 24 months is 1.44x', () => {
   expect(values.growthFactor).toBeCloseTo(1.44, 6);
 });
 
+test('EC-X blends with hot data: cold fraction below 100 lowers usable capacity', () => {
+  const pureArchive = { ...base, rf: 'ecx41', coldDataPercent: 100 };
+  const mixed = { ...base, rf: 'ecx41', coldDataPercent: 60 };
+  const a = sizerEngine.evaluate(pureArchive, {}).values;
+  const m = sizerEngine.evaluate(mixed, {}).values;
+  // 100% cold uses the full 0.80 factor; 60% cold blends toward RF2 0.50, so
+  // usable per raw TB drops and effective capacity per node falls.
+  expect(a.usableMultiplier).toBeGreaterThan(m.usableMultiplier);
+  // Blend at 60%: 0.6*0.80 + 0.4*0.50 = 0.68, times (1 - 0.12) = 0.5984
+  expect(m.usableMultiplier).toBeCloseTo(0.68 * 0.88, 4);
+  // RF2/RF3 are untouched by coldDataPercent
+  const rf2a = sizerEngine.evaluate({ ...base, rf: 'rf2', coldDataPercent: 50 }, {}).values;
+  const rf2b = sizerEngine.evaluate({ ...base, rf: 'rf2', coldDataPercent: 100 }, {}).values;
+  expect(rf2a.usableMultiplier).toBe(rf2b.usableMultiplier);
+});
+
+test('combined data efficiency past 3x raises a caution on effective capacity', () => {
+  const marketingClaim = { ...base, compressionRatio: 1.75, dedupRatio: 3.0 }; // 5.25x
+  const t = sizerEngine.evaluate(marketingClaim, {}).traces.effectiveTbPerNode;
+  expect(t.warnings.some((w) => w.severity === 'caution' && /vendor marketing/.test(w.message))).toBe(true);
+  const honest = sizerEngine.evaluate({ ...base, compressionRatio: 1.5, dedupRatio: 1.0 }, {}).traces.effectiveTbPerNode;
+  expect(honest.warnings.length).toBe(0);
+});
+
+test('CVM bigger than the node profile is caught, never a divide by zero', () => {
+  const impossible = { ...base, nodeCores: 8, cvmProfile: 'heavy', nodeRamGb: 48 }; // heavy CVM = 16 vCPU / 64 GB
+  const { values, traces } = sizerEngine.evaluate(impossible, {});
+  expect(Number.isFinite(values.nodesByCpu)).toBe(false); // Infinity, not NaN or a wrong finite count
+  expect(traces.nodesByCpu.warnings.some((w) => w.severity === 'critical')).toBe(true);
+  expect(traces.nodesByRam.warnings.some((w) => w.severity === 'critical')).toBe(true);
+});
+
+test('largest VM that does not fit one node raises a critical gate warning', () => {
+  // 768 GB node, standard CVM 48 GB, 80% ceiling => (768-48)*0.8 = 576 GB usable
+  const monster = { ...base, largestVmRamGb: 640 };
+  const t = sizerEngine.evaluate(monster, {}).traces.nodesByRam;
+  expect(t.warnings.some((w) => w.severity === 'critical' && /largest VM/.test(w.message))).toBe(true);
+  const fine = sizerEngine.evaluate({ ...base, largestVmRamGb: 400 }, {}).traces.nodesByRam;
+  expect(fine.warnings.some((w) => /largest VM/.test(w.message))).toBe(false);
+});
+
 test('every sizer trace exposes algebra, substitution, and sources', () => {
   const { traces } = sizerEngine.evaluate(base, {});
   for (const t of Object.values(traces)) {

@@ -3191,6 +3191,118 @@
           "url": "https://en.wikipedia.org/wiki/Byte#Multiple-byte_units"
         }
       ]
+    },
+    {
+      "key": "sizer-reservationPercent",
+      "title": "Platform capacity reservation",
+      "what": "The share of raw storage the platform holds back before you plan any data onto it. The guide uses 10 to 15 percent; the worked example uses 12.",
+      "why": "A hyperconverged cluster needs free space to rebuild after a node or disk failure, to absorb write bursts, and to keep latency sane as it fills. Plan into the reserved space and the first failure fills the cluster.",
+      "math": "It multiplies straight into usable capacity: usableMultiplier = rfFactor x (1 - reservationPercent/100). At 12 percent you keep 88 percent of what RF already left you.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        },
+        {
+          "label": "Why free space matters in HCI (Wikipedia, RAID rebuild)",
+          "url": "https://en.wikipedia.org/wiki/Standard_RAID_levels"
+        }
+      ]
+    },
+    {
+      "key": "sizer-storageCeiling",
+      "title": "Storage utilization ceiling",
+      "what": "The highest fraction of usable storage you plan to fill at peak. The guide says never plan past 0.75.",
+      "why": "Storage past roughly 75 percent full slows down and leaves no room for snapshots, a rebuild, or a bad week. Snapshot space lives inside this headroom, it is not a separate pool.",
+      "math": "It scales effective capacity per node: effectiveTbPerNode = nodeRawTb x usableMultiplier x storageCeiling x compression x dedup. Raising it toward 1.0 pretends the cluster can run full.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        }
+      ]
+    },
+    {
+      "key": "sizer-cpuCeiling",
+      "title": "CPU utilization ceiling",
+      "what": "The highest average CPU load you plan for at peak. The guide uses 0.70.",
+      "why": "A cluster planned to 100 percent CPU has nowhere to put a failed node's VMs during a rebuild or a maintenance window. Seventy percent leaves the room a real estate needs.",
+      "math": "It sets usable cores per node in the CPU gate: nodesByCpu = ceil(coresDemand / ((nodeCores - cvmVcpu) x cpuCeiling)). Higher ceiling, fewer nodes, less safety.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        }
+      ]
+    },
+    {
+      "key": "sizer-ramCeiling",
+      "title": "RAM utilization ceiling",
+      "what": "The highest fraction of node RAM you plan to use at peak. The guide band is 0.75 to 0.85; 0.80 is used here.",
+      "why": "RAM is the gate that most often decides node count in real estates, and it does not overcommit gracefully in production. Leaving 20 percent is what lets a failed node's VMs land somewhere.",
+      "math": "It sets usable RAM per node in the RAM gate: nodesByRam = ceil(ramDemandGb / ((nodeRamGb - cvmRamGb) x ramCeiling)).",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        }
+      ]
+    },
+    {
+      "key": "sizer-rangePlusPercent",
+      "title": "Honest range band",
+      "what": "How much wider than the computed floor the top of the quoted range sits. The guide is blunt: these rules land within roughly 25 percent.",
+      "why": "Conversation-grade math is not Sizer. Quoting a single node number implies a precision nobody has before real workload data. The band makes the honesty visible.",
+      "math": "It sets the ceiling of the range: nodeCeilingQuote = ceil(nodeFloor x (1 + rangePlusPercent/100)). At 25 percent an 8 node floor quotes 8 to 10.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        }
+      ]
+    },
+    {
+      "key": "sizer-largestVmVcpu",
+      "title": "Largest VM vCPU",
+      "what": "The vCPU count of the single biggest VM in the estate. Zero means unknown or not imported.",
+      "why": "Averages size the cluster, but the biggest VM sizes the node: a VM that needs more vCPU than one node offers after the CVM tax cannot run without contention, no matter how the averages look.",
+      "math": "It is checked against usable cores per node: if largestVmVcpu > (nodeCores - cvmVcpu) x cpuCeiling, the CPU gate raises a critical warning. The file importer fills this automatically.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        }
+      ]
+    },
+    {
+      "key": "sizer-largestVmRamGb",
+      "title": "Largest VM RAM",
+      "what": "The RAM of the single biggest VM in the estate, in GB. Zero means unknown or not imported.",
+      "why": "The 600 VM estate averaging 16 GB always hides one 512 GB SQL box. If it does not fit one node after the CVM tax and headroom, the whole node profile has to grow.",
+      "math": "It is checked against usable RAM per node: if largestVmRamGb > (nodeRamGb - cvmRamGb) x ramCeiling, the RAM gate raises a critical warning.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        }
+      ]
+    },
+    {
+      "key": "sizer-coldDataPercent",
+      "title": "Cold data percent (EC-X)",
+      "what": "The fraction of your data that has gone write-cold and can be erasure coded. Only used when the data protection selection is an EC-X profile.",
+      "why": "Nutanix erasure coding only encodes extents after they stop being written; hot data stays at RF2 until it cools. Assuming 100 percent cold overstates usable capacity for anything but a pure archive.",
+      "math": "It blends the two factors: blended = coldPct x ecFactor + (1 - coldPct) x 0.50 (RF2 for hot data), which then feeds usableMultiplier. At 60 percent cold on EC-X 4+1 that is 0.6 x 0.80 + 0.4 x 0.50 = 0.68.",
+      "related": [
+        {
+          "label": "Nutanix sizing rules (appendix F)",
+          "url": "https://github.com/nixfred/nutanix/blob/main/curriculum/nutanix/appendices/appendix-f-sizing-rules.md"
+        },
+        {
+          "label": "Erasure coding (Wikipedia)",
+          "url": "https://en.wikipedia.org/wiki/Erasure_code"
+        }
+      ]
     }
   ]
 }

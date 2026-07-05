@@ -6,7 +6,7 @@
    8 nodes x 4 x 7.68 TB = 245.76 TB raw -> RF2 -12% reservation ~ 108 TB
    usable -> ~216 TB effective at 2x compression. */
 
-import { makeEngine } from '../tokenops/engine.js';
+import { makeEngine, fmt } from '../tokenops/engine.js';
 
 export const RF = {
   rf2: { label: 'RF2', factor: 0.50, minNodes: 3, failureReserve: 1 },
@@ -25,7 +25,10 @@ export const CVM = {
    (the guide's overcommit anchor is a documented gap). */
 export const PRESETS = {
   general: { label: 'General virtualization', vcpuToPcpu: 4, compressionRatio: 1.75, dedupRatio: 1.0, cvmProfile: 'standard' },
-  vdi: { label: 'VDI (non-persistent)', vcpuToPcpu: 4, compressionRatio: 1.75, dedupRatio: 3.0, cvmProfile: 'heavy' },
+  // Compression held low deliberately: heavily deduped VDI has little
+  // redundancy left for compression to find, so 1.3 x 3.0 = 3.9x combined,
+  // not 1.75 x 3.0 = 5.25x. The two ratios overlap on the same duplicate data.
+  vdi: { label: 'VDI (non-persistent)', vcpuToPcpu: 4, compressionRatio: 1.3, dedupRatio: 3.0, cvmProfile: 'heavy' },
   database: { label: 'Database', vcpuToPcpu: 2, compressionRatio: 1.5, dedupRatio: 1.0, cvmProfile: 'heavy' },
 };
 
@@ -50,7 +53,30 @@ export const SIZER_DEFAULTS = {
   cpuCeiling: 0.70,
   ramCeiling: 0.80,
   rangePlusPercent: 25,
+  // Fraction of data that has gone write-cold and can be erasure coded.
+  // Only used when rf is an EC-X profile; hot data stays at RF2 until it
+  // cools. Default 100 keeps every existing path identical.
+  coldDataPercent: 100,
+  // Largest single VM in the estate. 0 means unknown (manual entry) or not
+  // yet imported. The biggest VM sizes the node; the averages size the
+  // cluster. Populated automatically by the file importer.
+  largestVmVcpu: 0,
+  largestVmRamGb: 0,
 };
+
+// The RF2 factor is the fallback for hot data when EC-X is selected: hot
+// extents stay two-copy until they cool enough to be encoded.
+const HOT_FALLBACK_FACTOR = RF.rf2.factor;
+
+/* When EC-X is selected, only write-cold data is actually encoded; hot data
+   stays at RF2. Blend the two by the cold fraction. RF2/RF3 are unaffected. */
+export function effectiveRfFactor(s) {
+  const rf = RF[s.rf];
+  const isEcx = s.rf === 'ecx41' || s.rf === 'ecx42';
+  if (!isEcx) return rf.factor;
+  const cold = Math.max(0, Math.min(100, s.coldDataPercent ?? 100)) / 100;
+  return cold * rf.factor + (1 - cold) * HOT_FALLBACK_FACTOR;
+}
 
 const defs = [];
 
@@ -77,12 +103,24 @@ defs.push({
   whyItMatters: 'RF or erasure coding plus the platform capacity reservation set the floor of every storage number.',
   plainEnglish: 'the replication factor multiplier times one minus the capacity reservation',
   algebra: 'usableMultiplier = rfFactor * (1 - reservationPercent/100)',
-  vars: (s) => [
-    { symbol: 'rfFactor', label: `${RF[s.rf].label} multiplier`, value: RF[s.rf].factor, source: 'appendix-f raw-to-usable table' },
-    { symbol: 'reservationPercent', label: 'Capacity reservation percent', value: s.reservationPercent, editable: true, source: 'guide: 10-15 percent, worked example uses 12' },
-  ],
-  compute: (v) => v.rfFactor * (1 - v.reservationPercent / 100),
-  assumptions: (s) => [`${RF[s.rf].label}: minimum ${RF[s.rf].minNodes} nodes, tolerates ${RF[s.rf].failureReserve} node failure(s) (appendix-f).`],
+  vars: (s) => {
+    const isEcx = s.rf === 'ecx41' || s.rf === 'ecx42';
+    const rfVar = isEcx
+      ? { symbol: 'rfFactor', label: `${RF[s.rf].label} blended factor (${s.coldDataPercent ?? 100} percent cold)`, value: effectiveRfFactor(s), source: `EC-X encodes write-cold data only; blend = ${s.coldDataPercent ?? 100}% x ${RF[s.rf].factor} + ${100 - (s.coldDataPercent ?? 100)}% x ${HOT_FALLBACK_FACTOR} (RF2 for hot data)` }
+      : { symbol: 'rfFactor', label: `${RF[s.rf].label} multiplier`, value: RF[s.rf].factor, source: 'appendix-f raw-to-usable table' };
+    return [
+      rfVar,
+      { symbol: 'reservationPercent', label: 'Capacity reservation percent', value: s.reservationPercent, editable: true, source: 'guide: 10-15 percent, worked example uses 12' },
+    ];
+  },
+  compute: (v, s) => effectiveRfFactor(s) * (1 - v.reservationPercent / 100),
+  assumptions: (s) => {
+    const base = [`${RF[s.rf].label}: minimum ${RF[s.rf].minNodes} nodes, tolerates ${RF[s.rf].failureReserve} node failure(s) (appendix-f).`];
+    if (s.rf === 'ecx41' || s.rf === 'ecx42') {
+      base.push(`EC-X applies to write-cold data only; hot data stays at RF2 until it cools. Cold fraction assumed ${s.coldDataPercent ?? 100} percent. Verify against the real workload write pattern before quoting.`);
+    }
+    return base;
+  },
   sourceIds: ['nutanix_appendix_f'],
 });
 
@@ -102,6 +140,13 @@ defs.push({
   ],
   compute: (v) => v.nodeRawTb * v.usableMultiplier * v.storageCeiling * v.compressionRatio * v.dedupRatio,
   assumptions: () => ['Snapshot space is folded into the 75 percent storage ceiling, matching the guide.', 'Data efficiency ranges are planning numbers, validated only by a POC on real data.'],
+  warn: (value, v) => {
+    const combined = v.compressionRatio * v.dedupRatio;
+    if (combined > 3) {
+      return [{ severity: 'caution', message: `Combined data efficiency of ${fmt(combined, 2)}x is in vendor marketing territory. Compression and dedup overlap on the same redundant data, so treat anything past 3x as unproven until a POC runs on real data.` }];
+    }
+    return [];
+  },
   sourceIds: ['nutanix_appendix_f'],
 });
 
@@ -182,7 +227,21 @@ defs.push({
     { symbol: 'cvmVcpu', label: `CVM vCPU (${CVM[s.cvmProfile].label})`, value: CVM[s.cvmProfile].vcpu, source: 'appendix-f CVM table; re-validate against portal specs' },
     { symbol: 'cpuCeiling', label: 'CPU utilization ceiling', value: s.cpuCeiling, editable: true, source: 'guide: 70 percent at peak' },
   ],
-  compute: (v) => Math.ceil(v.coresDemand / ((v.nodeCores - v.cvmVcpu) * v.cpuCeiling)),
+  compute: (v) => {
+    const usable = (v.nodeCores - v.cvmVcpu) * v.cpuCeiling;
+    if (usable <= 0) return Infinity; // guarded in warn: CVM bigger than node
+    return Math.ceil(v.coresDemand / usable);
+  },
+  warn: (value, v, s) => {
+    const out = [];
+    const usableCores = (v.nodeCores - v.cvmVcpu) * v.cpuCeiling;
+    if (usableCores <= 0) {
+      out.push({ severity: 'critical', message: `The ${CVM[s.cvmProfile].label} CVM reserves ${v.cvmVcpu} vCPU, which leaves no usable cores on a ${v.nodeCores} core node at the ${fmt(v.cpuCeiling * 100)} percent ceiling. Pick a larger node profile or a lighter CVM.` });
+    } else if (s.largestVmVcpu > 0 && s.largestVmVcpu > usableCores) {
+      out.push({ severity: 'critical', message: `Your largest VM needs ${fmt(s.largestVmVcpu)} vCPU but one node offers only ${fmt(usableCores)} usable cores after the CVM tax and the ${fmt(v.cpuCeiling * 100)} percent ceiling. A single VM past usable cores per node guarantees contention. The biggest VM sizes the node; averages size the cluster.` });
+    }
+    return out;
+  },
   sourceIds: ['nutanix_appendix_f'],
 });
 
@@ -199,7 +258,21 @@ defs.push({
     { symbol: 'cvmRamGb', label: `CVM RAM GB (${CVM[s.cvmProfile].label})`, value: CVM[s.cvmProfile].ramGb, source: 'appendix-f CVM table' },
     { symbol: 'ramCeiling', label: 'RAM utilization ceiling', value: s.ramCeiling, editable: true, source: 'guide: 75-85 percent; 80 used' },
   ],
-  compute: (v) => Math.ceil(v.ramDemandGb / ((v.nodeRamGb - v.cvmRamGb) * v.ramCeiling)),
+  compute: (v) => {
+    const usable = (v.nodeRamGb - v.cvmRamGb) * v.ramCeiling;
+    if (usable <= 0) return Infinity; // guarded in warn: CVM bigger than node
+    return Math.ceil(v.ramDemandGb / usable);
+  },
+  warn: (value, v, s) => {
+    const out = [];
+    const usableRam = (v.nodeRamGb - v.cvmRamGb) * v.ramCeiling;
+    if (usableRam <= 0) {
+      out.push({ severity: 'critical', message: `The ${CVM[s.cvmProfile].label} CVM reserves ${v.cvmRamGb} GB, which leaves no usable memory on a ${fmt(v.nodeRamGb)} GB node at the ${fmt(v.ramCeiling * 100)} percent ceiling. Pick a larger node profile or a lighter CVM.` });
+    } else if (s.largestVmRamGb > 0 && s.largestVmRamGb > usableRam) {
+      out.push({ severity: 'critical', message: `Your largest VM needs ${fmt(s.largestVmRamGb)} GB but one node offers only ${fmt(usableRam)} GB usable after the CVM tax and the ${fmt(v.ramCeiling * 100)} percent ceiling. The biggest VM sizes the node; averages size the cluster. This can force a larger node profile than the averages suggest.` });
+    }
+    return out;
+  },
   sourceIds: ['nutanix_appendix_f'],
 });
 
@@ -218,10 +291,24 @@ defs.push({
     { symbol: 'rfMinNodes', label: 'RF minimum nodes', value: RF[s.rf].minNodes, source: 'appendix-f minimums' },
   ],
   compute: (v) => Math.max(Math.max(v.nodesByCpu, v.nodesByRam, v.nodesByStorage) + v.failureReserve, v.rfMinNodes),
-  warn: (value, v) => {
+  warn: (value, v, s, R) => {
     const gates = { CPU: v.nodesByCpu, RAM: v.nodesByRam, STORAGE: v.nodesByStorage };
     const winner = Object.entries(gates).sort((a, b) => b[1] - a[1])[0][0];
-    return [{ severity: 'info', message: `Binding gate: ${winner} (CPU ${v.nodesByCpu}, RAM ${v.nodesByRam}, storage ${v.nodesByStorage}), plus ${v.failureReserve} failure reserve.` }];
+    const out = [{ severity: 'info', message: `Binding gate: ${winner} (CPU ${v.nodesByCpu}, RAM ${v.nodesByRam}, storage ${v.nodesByStorage}), plus ${v.failureReserve} failure reserve.` }];
+    // Sanity cross-check for VDI: implied desktops per node against the
+    // guide's published task-worker band (120 to 180 per node). A number
+    // far outside it means the estate is not really task-worker VDI, or the
+    // node profile is wrong.
+    if (s.workloadType === 'vdi' && value > 0) {
+      const grown = s.vmCount * (R?.growthFactor ?? 1);
+      const perNode = grown / value;
+      if (perNode > 180) {
+        out.push({ severity: 'caution', message: `Implied density is about ${fmt(perNode)} desktops per node, above the guide's task-worker band of 120 to 180. Confirm these are light task-worker desktops, not knowledge-worker or GPU-accelerated seats, which pack far fewer per node.` });
+      } else if (perNode < 60) {
+        out.push({ severity: 'info', message: `Implied density is about ${fmt(perNode)} desktops per node, below the guide's task-worker band. That is fine for heavier seats, but if these are light desktops the node profile may be larger than this workload needs.` });
+      }
+    }
+    return out;
   },
   sourceIds: ['nutanix_appendix_f'],
 });

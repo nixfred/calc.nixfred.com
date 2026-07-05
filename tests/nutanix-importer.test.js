@@ -3,7 +3,7 @@
    every expected number below is hand-computed in the fixture comments. */
 
 import { describe, test, expect } from 'bun:test';
-import { importEstateFile, parseWorkbook, detectFormat } from '../src/lib/nutanix-sizer/importer.js';
+import { importEstateFile, parseWorkbook, detectFormat, scopeResult } from '../src/lib/nutanix-sizer/importer.js';
 import { collectorFixture, rvtoolsFixture, makeXlsx } from './helpers/make-xlsx.js';
 
 describe('format detection', () => {
@@ -73,6 +73,67 @@ describe('RVTools vInfo import', () => {
   });
   test('provenance names RVTools and version', () => {
     expect(result.provenance).toContain('RVTools 4.7.1');
+  });
+});
+
+describe('multi-cluster, largest VM, provisioned, integrity', () => {
+  const result = importEstateFile(collectorFixture());
+
+  test('the fixture is detected as two clusters and can be scoped to one', () => {
+    expect(result.clusters.map((c) => c.name).sort()).toEqual(['ClusterA', 'ClusterB']);
+    expect(result.included).toBe(6); // all combined by default
+    const b = scopeResult(result.raw, 'ClusterB');
+    expect(b.included).toBe(1);               // only app-erp-01
+    expect(b.patch.avgVcpuPerVm).toBe(16);
+    expect(b.notes.some((n) => /spans 2 clusters/.test(n.label))).toBe(true);
+  });
+
+  test('largest VM is surfaced for the fit-node check', () => {
+    expect(result.patch.largestVmVcpu).toBe(16);   // app-erp-01
+    expect(result.patch.largestVmRamGb).toBe(64);  // 65536 MiB
+    expect(result.notes.some((n) => /Largest VM/.test(n.label))).toBe(true);
+  });
+
+  test('provisioned is summed alongside used and shown, but used drives sizing', () => {
+    expect(result.provisionedTb).toBeGreaterThan(result.patch.usedStorageTb);
+    const storageNote = result.notes.find((n) => /used storage/.test(n.label));
+    expect(storageNote.why).toMatch(/provisioned/);
+  });
+
+  test('blank cells and duplicate names are counted, not silently zeroed', () => {
+    const dirty = makeXlsx({
+      vInfo: [
+        ['VM', 'Powerstate', 'CPUs', 'Memory', 'In Use MiB', 'Cluster'],
+        ['a', 'poweredOn', 2, 4096, 200000, 'Prod'],
+        ['a', 'poweredOn', 2, 4096, 200000, 'Prod'],   // duplicate name
+        ['b', 'poweredOn', 4, '', 300000, 'Prod'],      // blank memory
+        ['c', 'poweredOn', 2, 4096, '', 'Prod'],        // blank storage
+      ],
+    });
+    const r = importEstateFile(dirty);
+    expect(r.included).toBe(4);
+    expect(r.integrity.duplicateNames).toBe(1);
+    expect(r.integrity.blankRam).toBe(1);
+    expect(r.integrity.blankStorage).toBe(1);
+    expect(r.notes.some((n) => /Data quality flags/.test(n.label))).toBe(true);
+  });
+
+  test('a Collector JSON drop gets a helpful pointer, not a zip error', () => {
+    const json = new TextEncoder().encode('{"vmList": []}');
+    expect(() => importEstateFile(json)).toThrow(/Collector JSON export/);
+  });
+
+  test('pre-4.1 RVTools MB headers are accepted with a provenance note', () => {
+    const legacy = makeXlsx({
+      vInfo: [
+        ['VM', 'Powerstate', 'CPUs', 'Memory', 'In Use MB'],
+        ['a', 'poweredOn', 2, 4096, 1000000],
+      ],
+    });
+    const r = importEstateFile(legacy);
+    expect(r.included).toBe(1);
+    expect(r.patch.usedStorageTb).toBe(1.0);
+    expect(r.provenance).toMatch(/legacy MB headers/);
   });
 });
 
