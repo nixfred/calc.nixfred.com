@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/readme/calc-hero.png" alt="Calc dot nixfred dot com field calculators for infrastructure decisions" width="100%">
+<img src="public/share/card.png" alt="Calc dot nixfred dot com field calculators for infrastructure decisions" width="100%">
 
 # calc.nixfred.com
 
