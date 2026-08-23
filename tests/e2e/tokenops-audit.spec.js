@@ -38,12 +38,19 @@ test.describe('Section 46 QA scenario (exact numbers)', () => {
 });
 
 test.describe('Section 45 acceptance criteria (machine checkable)', () => {
-  test('1. loads without external build tools at runtime, all client side', async ({ page }) => {
+  test('1. all client side; ONLY the cookieless analytics beacon may leave the page', async ({ page }) => {
+    // Criterion 40: no customer data transmitted. The CF Web Analytics beacon
+    // (cookieless page counts, settled in the landing interview) is the ONLY
+    // permitted external host; anything else appearing here is a violation.
+    const ALLOWED = ['static.cloudflareinsights.com', 'cloudflareinsights.com'];
     const external = [];
-    page.on('request', (r) => { const u = new URL(r.url()); if (u.hostname !== 'localhost') external.push(r.url()); });
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (u.hostname !== 'localhost' && !ALLOWED.some((h) => u.hostname.endsWith(h))) external.push(r.url());
+    });
     await open(page);
     await page.waitForTimeout(800);
-    expect(external).toEqual([]); // criterion 40: no customer data transmitted, no external calls at all
+    expect(external).toEqual([]);
   });
 
   test('2-9. legacy workload formulas present, editable, and correct', async ({ page }) => {
@@ -113,7 +120,7 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
       'https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/',
       'https://www.nvidia.com/en-us/data-center/h200/',
       'https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html',
-      'buy.hpe.com', // XD685 listing (criterion 45.25)
+      'proliant-compute-xd685', // XD685 canonical page (criterion 45.25, URL upgraded 2026-07-03)
     ]) expect(html).toContain(url);
   });
 
@@ -172,10 +179,10 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
     await expect(page.locator('#tokenops-summary')).toContainText('Do not size yet').catch(() => {});
   });
 
-  test('decode animation settles to real text (no permanently scrambled headings)', async ({ page }) => {
+  test('front door heading renders clean text (scramble is banned inside the calculator)', async ({ page }) => {
     await page.goto('/tokenops/');
-    await page.waitForTimeout(1500);
-    await expect(page.locator('.chooser h1')).toHaveText('TokenOps');
+    await page.waitForTimeout(1200);
+    await expect(page.locator('.start h1')).toHaveText('What are you building?');
   });
 
   test('45.11 model size quick pick offers the spec rows', async ({ page }) => {
@@ -196,8 +203,8 @@ test.describe('Section 45 acceptance criteria (machine checkable)', () => {
 test.describe('Section 0 settled decisions', () => {
   test('0.1.2 chooser screen first with both modes', async ({ page }) => {
     await page.goto('/tokenops/');
-    await expect(page.locator('button[data-goto="meeting"]')).toBeVisible();
-    await expect(page.locator('button[data-goto="architect"]')).toBeVisible();
+    await expect(page.locator('button[data-goto="meeting"]').first()).toBeVisible();
+    await expect(page.locator('button[data-goto="architect"]').first()).toBeVisible();
   });
 
   test('0.2.7 co-recommend logic exists; 0.2.8 do-not-size fires on missing gates', async ({ page }) => {
@@ -218,8 +225,15 @@ test.describe('Section 0 settled decisions', () => {
   test('0.4 ceiling: never a hardware price, quote slot verdict works', async ({ page }) => {
     await open(page);
     await expect(page.locator('.ceiling-headline')).toBeVisible();
+    // An absurd $1 quote is rejected as implausible, not celebrated (Fred UX catch).
+    const absurd = await page.evaluate(() => {
+      window.__tokenops.getState().gpuQuote = 1;
+      return window.__tokenops.compute().ceiling.verdict.implausible;
+    });
+    expect(absurd).toBe(true);
     const verdict = await page.evaluate(() => {
-      window.__tokenops.getState().gpuQuote = 1; // absurdly cheap quote
+      const half = Math.round(window.__tokenops.compute().ceiling.ceilingCapex * 0.5);
+      window.__tokenops.getState().gpuQuote = half; // realistic, comfortably under
       return window.__tokenops.compute().ceiling.verdict.under;
     });
     expect(verdict).toBe(true);
@@ -286,8 +300,11 @@ test.describe('Section 0 settled decisions', () => {
 
   test('landing page: TokenOps LIVE and the ENTIRE card is clickable (Fred standard 2026-07-03)', async ({ page }) => {
     await page.goto('/');
-    const link = page.locator('.calc-card.live a.card-link');
+    const link = page.locator('.calc-card.live a.card-link[href="/tokenops"]');
     await expect(link).toHaveAttribute('href', '/tokenops');
+    // Every LIVE card is fully clickable, however many there are.
+    const liveCards = await page.locator('.calc-card.live').count();
+    expect(await page.locator('.calc-card.live a.card-link').count()).toBe(liveCards);
     // The link must wrap the whole card content: title, description, and meta.
     await expect(link.locator('.calc-title')).toBeVisible();
     await expect(link.locator('.calc-desc')).toBeVisible();
@@ -297,4 +314,177 @@ test.describe('Section 0 settled decisions', () => {
     await expect(page).toHaveURL(/\/tokenops\/?$/);
     await expect(page.locator('#tokenops-root')).toBeVisible();
   });
+});
+
+test('meeting answer page relists the wizard inputs (Fred ask 2026-07-03)', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.evaluate(() => document.querySelector('button[data-goto="meeting"]').click());
+  for (let i = 0; i < 4; i++) {
+    await page.locator('button[data-wiz="next"]').click();
+    await page.waitForTimeout(150);
+  }
+  await expect(page.locator('#inputs-recap')).toBeVisible();
+  await expect(page.locator('#inputs-recap')).toContainText('What you told it');
+  await expect(page.locator('#inputs-recap')).toContainText('Adoption');
+  await expect(page.locator('#inputs-recap')).toContainText('Data can leave');
+});
+
+test('decision card: verdict banner flips as the quote slider moves (Fred ROI ask)', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.evaluate(() => document.querySelector('button[data-goto="architect"]').click());
+  await expect(page.locator('#decision-card .v-quote')).toBeVisible(); // no quote: GET A QUOTE
+  const verdicts = await page.evaluate(() => {
+    const s = window.__tokenops.getState();
+    const out = [];
+    const base = window.__tokenops.compute().providerBaseline;
+    s.financeMode = 'cash'; s.financeTermMonths = 36;
+    s.gpuQuote = base * 36 * 0.5;  out.push(window.__tokenops.compute().fin.verdict); // well under bar
+    s.gpuQuote = base * 36 * 0.8;  out.push(window.__tokenops.compute().fin.verdict); // between bar and tokens
+    s.gpuQuote = base * 36 * 1.5;  out.push(window.__tokenops.compute().fin.verdict); // above tokens
+    return out;
+  });
+  expect(verdicts).toEqual(['buy', 'negotiate', 'tokens']);
+});
+
+test('20c: presets are the front door - pattern wizard routes to a landing with assumptions', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await expect(page.locator('.start h1')).toContainText('What are you building?');
+  expect(await page.locator('.pattern-card').count()).toBeGreaterThanOrEqual(8);
+  await page.locator('.pattern-card[data-pattern="knowledge-rag"]').click();
+  await page.selectOption('#start-scale', 'department');
+  await page.selectOption('#start-data', 'with-controls');
+  await page.locator('#start-go').click();
+  await expect(page.locator('h1')).toContainText('Internal knowledge assistant');
+  await expect(page.locator('.card-title', { hasText: 'What we just assumed' })).toBeVisible();
+  expect(await page.locator('.verify-flag').count()).toBeGreaterThanOrEqual(3);
+  const s = await page.evaluate(() => window.__tokenops.getState());
+  expect(s.users).toBe(240);
+  expect(s.dataCanLeave).toBe('with-controls');
+  expect(s.ragEnabled).toBe(true);
+  await page.locator('button.primary[data-goto="meeting-answer"]').click();
+  await expect(page.locator('.rec-headline').first()).toBeVisible();
+});
+
+test('20c: example Customers load as flagship presets with variable teaching notes', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await expect(page.locator('.persona-card')).toHaveCount(3);
+  await page.locator('.persona-card[data-persona="0"]').click();
+  await expect(page.locator('h1')).toContainText('Calloway Reed');
+  await expect(page.locator('.landing-story')).toContainText('240 attorney');
+  await expect(page.locator('th', { hasText: 'what it drives' })).toBeVisible();
+  const s = await page.evaluate(() => window.__tokenops.getState());
+  expect(s.users).toBe(240);
+  expect(s.chunksRetrievedPerQuery).toBe(8);
+  await page.locator('button.primary[data-goto="meeting-answer"]').click();
+  await expect(page.locator('#inputs-recap')).toBeVisible();
+});
+
+test('navigation: no view is a dead end (Fred: trapped)', async ({ page }) => {
+  await page.goto('/tokenops/');
+  // Start screen carries the nav.
+  await expect(page.locator('.app-nav')).toBeVisible();
+  // Load a persona, land, then walk: landing -> answer -> architect -> landing -> start.
+  await page.locator('.persona-card[data-persona="0"]').click();
+  await expect(page.locator('.nav-item.on', { hasText: 'Starting point' })).toBeVisible();
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  await expect(page.locator('.rec-headline').first()).toBeVisible();
+  await expect(page.locator('button', { hasText: 'back to your starting point' })).toBeVisible();
+  await page.locator('.app-nav .nav-item', { hasText: 'Every dial' }).click();
+  await expect(page.locator('.a-section').first()).toBeVisible();
+  await page.locator('.app-nav .nav-item', { hasText: 'Starting point' }).click();
+  await expect(page.locator('h1')).toContainText('Calloway Reed');
+  // Poison a rate cell and carry a section hash, then Start over must clean BOTH (Fred's catch).
+  await page.locator('.app-nav .nav-item', { hasText: 'Every dial' }).click();
+  await page.evaluate(() => {
+    location.hash = '#sec-topology';
+    const r = document.querySelector('input[data-rate="0"][data-ratefield="inputPerMillion"]');
+    r.value = '77'; r.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  await page.locator('.nav-reset').click();
+  await expect(page.locator('.start h1')).toContainText('What are you building?');
+  const s = await page.evaluate(() => window.__tokenops.getState());
+  expect(s.users).toBe(200); // defaults restored
+  const clean = await page.evaluate(() => ({ hash: location.hash, rate: window.__tokenops.compute().cmp.rows.find((r) => r.providerKey === 'anthropic').monthlyCost }));
+  expect(clean.hash).toBe('');
+  // Anthropic priced on pristine rates again (edited 77/MTok would inflate it hugely).
+  expect(clean.rate).toBeLessThan(3000);
+  // Legacy chooser is retired: any old goto lands on start, never a trap.
+  await page.evaluate(() => { window.__tokenops._test.reset(); });
+  await expect(page.locator('.start h1')).toBeVisible();
+});
+
+test('HPE configuration card renders with the ceiling bar and vendor links, both modes', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('#hpe-config-card')).toBeVisible();
+  await expect(page.locator('.config-budget')).toContainText('must land under');
+  await expect(page.locator('#hpe-config-card .src-pill').first()).toBeVisible();
+  await expect(page.locator('#hpe-config-card')).toContainText('not an orderable BOM');
+  // Meeting answer carries it too.
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="0"]').click();
+  await page.locator('button.primary[data-goto="meeting-answer"]').click();
+  await expect(page.locator('#hpe-config-card')).toBeVisible();
+});
+
+test('example Customer landings carry the HPE configuration too', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="1"]').click(); // Harborline Mutual
+  await expect(page.locator('h1')).toContainText('Harborline');
+  await expect(page.locator('#hpe-config-card')).toBeVisible();
+  await expect(page.locator('.config-budget')).toContainText('must land under');
+});
+
+test('teach layer: (i) opens the glowing popover with all four sections, closes on Escape', async ({ page }) => {
+  await open(page);
+  const btnCount = await page.locator('.info-btn').count();
+  expect(btnCount).toBeGreaterThan(50); // every advanced input carries a teacher
+  await page.locator('.info-btn[data-teach="cachedInputPercent"]').click();
+  const pop = page.locator('.teach-pop');
+  await expect(pop).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'what this is' })).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'why it is an input' })).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'the math it drives' })).toBeVisible();
+  await expect(pop.locator('.teach-k', { hasText: 'go deeper' })).toBeVisible();
+  await expect(pop.locator('.teach-links a').first()).toHaveAttribute('href', /^https:\/\//);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#teach-overlay')).toHaveCount(0);
+});
+
+/* ---------- point release: guidance, four outputs, sayable ---------- */
+
+test('answer comes before the recap, and the conversation script exists', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="1"]').click(); // Harborline
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  await expect(page.locator('.rec-headline').first()).toBeVisible();
+  // The fourth output now exists: a conversation script.
+  await expect(page.locator('.card-title', { hasText: 'Conversation script' })).toBeVisible();
+  // The one-sentence answer (Recommendation) renders before the recap.
+  const titles = await page.evaluate(() => [...document.querySelectorAll('#results .card-title')].map((e) => e.textContent));
+  const recIdx = titles.findIndex((t) => /Recommendation/.test(t));
+  const recapIdx = titles.findIndex((t) => /What you told it/.test(t));
+  expect(recIdx).toBeGreaterThanOrEqual(0);
+  expect(recapIdx).toBeGreaterThan(recIdx);
+});
+
+test('whiteboard why is sayable, not scoring jargon', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="1"]').click();
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  const why = await page.locator('.wb-why, .wb-inner').first().textContent();
+  // No "N points" jargon on the whiteboard the seller reads aloud.
+  expect(why).not.toMatch(/\d+\.\d+ points/);
+});
+
+test('cash mode mutes the term and APR sliders and says why', async ({ page }) => {
+  await page.goto('/tokenops/');
+  await page.locator('.persona-card[data-persona="2"]').click(); // Northgale
+  await page.locator('.app-nav .nav-item', { hasText: 'Answer' }).click();
+  await expect(page.locator('#decision-card')).toBeVisible();
+  // Default cash mode: term and APR disabled, with the explaining sentence.
+  await expect(page.locator('.slider-row.slider-muted input[data-field="financeTermMonths"]')).toBeDisabled();
+  await expect(page.locator('#decision-card')).toContainText('Cash amortizes over the useful life');
+  // Finance controls carry teach info buttons (previously dead content).
+  await expect(page.locator('#decision-card .info-btn[data-teach="financeMode"]')).toBeVisible();
 });

@@ -124,6 +124,17 @@ export function validateInputs(s) {
   if (s.savingsThresholdPercent !== undefined && (s.savingsThresholdPercent < 0 || s.savingsThresholdPercent > 90)) {
     bad('savingsThresholdPercent', 'Savings threshold must be 0 to 90 percent; higher values invert the ceiling math.', 'caution');
   }
+  // Cache hits apply only to the stable prompt prefix. With RAG or tool use on,
+  // retrieved chunks and tool results change per call and cannot be prefix
+  // cached, so a high cache rate overstates the discount.
+  if ((s.ragEnabled || s.toolUseEnabled) && (s.cachedInputPercent ?? 0) > 50) {
+    bad('cachedInputPercent', `Cache hits apply to the stable prompt prefix only. With ${s.ragEnabled && s.toolUseEnabled ? 'RAG and tool use' : s.ragEnabled ? 'RAG' : 'tool use'} on, retrieved and tool tokens change per call and bill uncached; ${s.cachedInputPercent} percent likely overstates the cached share.`, 'caution');
+  }
+  // Batch pricing needs up to 24 hour turnaround. Interactive agent work cannot
+  // wait, so a batch share on a fast-completing agent is not honest.
+  if ((s.batchEligiblePercent ?? 0) > 0 && s.wlModernAgent && (s.targetCompletionSeconds ?? 0) > 0 && s.targetCompletionSeconds < 3600) {
+    bad('batchEligiblePercent', `Batch API pricing requires up to 24 hour turnaround, but this agent targets ${s.targetCompletionSeconds} second completion. Only non-interactive work (summaries, memory writes, offline jobs) qualifies for the batch discount.`, 'caution');
+  }
   // The public-route-vs-policy conflict is enforced in the recommendation
   // engine (spec 37 critical warning), where the leading route is known.
   return out;

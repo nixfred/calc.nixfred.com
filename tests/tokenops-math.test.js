@@ -11,6 +11,7 @@ import { sourceLinkPills } from '../src/lib/tokenops/components.js';
 import defaults from '../src/data/tokenops/tokenops-defaults.json';
 import rules from '../src/data/tokenops/route-rules.json';
 import rates from '../src/data/tokenops/provider-rates.json';
+import personas from '../src/data/tokenops/example-customers.json';
 
 const state = structuredClone(defaults);
 
@@ -268,6 +269,30 @@ test('unpriced role is surfaced, and billedTokens excludes its tokens (no silent
   expect(partial.total).toBeLessThan(all.total);
 });
 
+test('FRED BUG 2026-07-03: quick workloads are PRICED, demand can never show $0 (422M token case)', () => {
+  // Reproduces the live report: RAG quick workload on, zero agent runs.
+  const s = { ...structuredClone(defaults), wlRag: true, users: 0 };
+  const { values } = engine.evaluate(s, {});
+  expect(values.ragMonthlyTokens).toBe(422400000); // 2000 * 20 * 22 * 8 * 60
+  const { total, billedTokens, perRole } = roleRoutedCost(s, values, rates);
+  expect(total).toBeGreaterThan(0);                       // dollars exist now
+  expect(billedTokens).toBeGreaterThanOrEqual(422400000); // and they cover the demand
+  const quick = perRole.find((r) => r.role === 'quick workloads');
+  expect(quick.cost).toBeGreaterThan(0);
+  // Hand check at 70/30 split, Anthropic workhorse (2 / 0.2 / 10), 40% cache:
+  // in 295.68M -> 0.6*295.68*2 + 0.4*295.68*0.2 = 354.816 + 23.6544
+  // out 126.72M -> 126.72 * 10 = 1267.2   => total 1645.67
+  expect(quick.cost).toBeCloseTo(1645.67, 1);
+});
+
+test('quick workload pricing respects the editable input/output split', () => {
+  const s = { ...structuredClone(defaults), wlRag: true, users: 0 };
+  const { values } = engine.evaluate(s, {});
+  const at70 = roleRoutedCost({ ...s, quickInputSharePercent: 70 }, values, rates).total;
+  const at100 = roleRoutedCost({ ...s, quickInputSharePercent: 100 }, values, rates).total;
+  expect(at100).toBeLessThan(at70); // all-input is cheaper than 30% output at 5x pricing
+});
+
 test('do-not-size usage gate accepts non-agent workloads (coding-only is known usage)', () => {
   const s = { ...structuredClone(defaults), wlModernAgent: false, wlCoding: true, developers: 25, users: 0 };
   expect(checkDoNotSize(s).length).toBe(0);
@@ -288,4 +313,132 @@ test('role routed cost prices cached vs uncached correctly (spec 15.1-15.2)', ()
   expect(planner.cachedMTok).toBeCloseTo(14.52, 6);
   const expectedPlanner = (36.3 - 14.52) * 10 + 14.52 * 1 + (11000 * 1.1 * 500 / 1e6) * 50;
   expect(planner.cost).toBeCloseTo(expectedPlanner, 6);
+});
+
+/* ---------- finance decision (Fred's ROI sliders, 2026-07-03) ---------- */
+
+test('finance decision: verdicts flip at the right thresholds', async () => {
+  const { financeDecision, hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const s = structuredClone(defaults);
+  const provider = 10000; // $10k/mo tokens
+  const ceiling = hardwareCeiling(s, provider); // $6k/mo bar, $216k capex
+  // No quote: demand one.
+  expect(financeDecision({ ...s, gpuQuote: null }, provider, ceiling).verdict).toBe('quote');
+  // Cash $180k over 36 = $5k/mo <= $6k bar -> BUY.
+  const buy = financeDecision({ ...s, gpuQuote: 180000, financeMode: 'cash' }, provider, ceiling);
+  expect(buy.verdict).toBe('buy');
+  expect(buy.payment).toBeCloseTo(5000, 6);
+  expect(buy.savings).toBeCloseTo(10000 * 36 - 180000, 6); // $180k saved
+  expect(buy.roiPct).toBeCloseTo(100, 6);
+  // Cash $300k over 36 = $8.33k/mo: cheaper than tokens, misses the 40% bar -> NEGOTIATE.
+  expect(financeDecision({ ...s, gpuQuote: 300000, financeMode: 'cash' }, provider, ceiling).verdict).toBe('negotiate');
+  // Cash $450k over 36 = $12.5k/mo > tokens -> TOKENS.
+  expect(financeDecision({ ...s, gpuQuote: 450000, financeMode: 'cash' }, provider, ceiling).verdict).toBe('tokens');
+});
+
+test('finance decision: loan payment matches the standard amortization formula', async () => {
+  const { financeDecision, hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const s = { ...structuredClone(defaults), gpuQuote: 100000, financeMode: 'financed', financeAprPercent: 8, financeTermMonths: 36 };
+  const fin = financeDecision(s, 10000, hardwareCeiling(s, 10000));
+  // 100000 at 8% APR over 36 months: r=0.0066667, payment = 3133.64
+  expect(fin.payment).toBeCloseTo(3133.64, 1);
+  expect(fin.verdict).toBe('buy');
+});
+
+test('example Customer stories do not contradict the engine (calls and daily volume)', () => {
+  // Every load-bearing number a persona quotes must be reproducible by running
+  // that persona through the same engine the tool uses. Catches story drift.
+  const check = (company, expect_) => {
+    const p = personas.find((x) => x.companyName === company);
+    const { values } = engine.evaluate({ ...structuredClone(defaults), ...p.inputs }, {});
+    const ad = p.inputs.activeDaysPerMonth ?? 22;
+    const runsDay = Math.round(values.monthlyRuns / ad);
+    const callsDay = Math.round(runsDay * values.baseCallsPerRun);
+    const blob = JSON.stringify(p);
+    expect(values.baseCallsPerRun).toBe(expect_.baseCalls);
+    // If the story cites a daily model-calls figure, it must be the real one.
+    if (expect_.callsDayStr) expect(blob).toContain(expect_.callsDayStr);
+    // The wrong figures must be gone.
+    for (const wrong of expect_.mustNotContain ?? []) expect(blob).not.toContain(wrong);
+    return { runsDay, callsDay, tokDayB: values.totalMonthlyTokens / ad / 1e9 };
+  };
+  const h = check('Harborline Mutual', { baseCalls: 12, callsDayStr: '74,880', mustNotContain: ['94,000', '15 calls each', '15 model calls per run'] });
+  expect(h.callsDay).toBe(74880);
+  const n = check('Northgale Communications', { baseCalls: 15, mustNotContain: ['27 billion tokens'] });
+  expect(Math.round(n.tokDayB)).toBe(37); // story now says ~37 billion, matching
+});
+
+test('finance and break even use ONE ownership payment (no card disagreement)', async () => {
+  const { financeDecision, hardwareCeiling, breakEvenTokens, ownershipMonthly, roleRoutedCost } = await import('../src/lib/tokenops/costs.js');
+  const s = { ...structuredClone(defaults), gpuQuote: 120000, financeMode: 'financed', financeAprPercent: 8, financeTermMonths: 24 };
+  const { values } = engine.evaluate(s, {});
+  const { total, billedTokens } = roleRoutedCost(s, values, rates);
+  const fin = financeDecision(s, 10000, hardwareCeiling(s, 10000));
+  const be = breakEvenTokens(s, values, 10000, billedTokens);
+  // Break even's monthly budget IS the finance payment, to the cent.
+  expect(be.monthlyBudget).toBeCloseTo(fin.payment, 6);
+  expect(fin.payment).toBeCloseTo(ownershipMonthly(s), 6);
+  // The substitution shows a real amortization formula, not placeholder text.
+  expect(fin.substitution).not.toContain('1.0)');
+  expect(fin.substitution).toMatch(/\[.*\] \/ \[.* - 1\]/);
+});
+
+test('servable share below 100 lowers the ceiling and states the hybrid remainder', async () => {
+  const { hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const full = hardwareCeiling(state, 10000);
+  const partial = hardwareCeiling({ ...state, servableSharePercent: 70 }, 10000);
+  expect(partial.ceilingMonthly).toBeCloseTo(10000 * 0.7 * 0.6, 6); // 4200
+  expect(partial.ceilingMonthly).toBeLessThan(full.ceilingMonthly);
+  const monthlyTrace = partial.traces.find((t) => t.id === 'hardwareCeilingMonthly');
+  expect(monthlyTrace.assumptions.some((a) => /hybrid/.test(a))).toBe(true);
+});
+
+test('cloud carries direct fit before policy AND pays its own lower policy penalty', () => {
+  const canLeave = { ...structuredClone(defaults), dataCanLeave: 'yes', needTimeToValue: 3, needQuality: 3 };
+  const cannot = { ...canLeave, dataCanLeave: 'no', dataSensitivity: 'high', regulatedData: true };
+  const { values } = engine.evaluate(canLeave, {});
+  const openCloud = scoreRoutes(canLeave, values, rules, { providerMonthlyCost: 5000 }, {}).routes.find((r) => r.key === 'cloud');
+  const lockedCloud = scoreRoutes(cannot, values, rules, { providerMonthlyCost: 5000 }, {}).routes.find((r) => r.key === 'cloud');
+  // Policy pressure now costs cloud points (it had none before), so a locked-
+  // down posture scores cloud lower than an open one.
+  expect(lockedCloud.penalties.some((p) => /policy pressure/i.test(p.label))).toBe(true);
+  expect(lockedCloud.raw).toBeLessThan(openCloud.raw);
+});
+
+test('a $1 quote is called a typo, not a deal (Fred UX catch)', async () => {
+  const { hardwareCeiling, financeDecision } = await import('../src/lib/tokenops/costs.js');
+  const s = { ...structuredClone(defaults), gpuQuote: 1 };
+  const ceiling = hardwareCeiling(s, 10000);
+  expect(ceiling.verdict.implausible).toBe(true);
+  const fin = financeDecision(s, 10000, ceiling);
+  expect(fin.headline).toBe('THAT IS NOT A QUOTE');
+  // A real quote still verdicts normally.
+  const real = hardwareCeiling({ ...s, gpuQuote: 150000 }, 10000);
+  expect(real.verdict.implausible).toBeUndefined();
+  expect(real.verdict.under).toBe(true);
+});
+
+/* ---------- all-HPE conversation configuration (Fred's go, 2026-07-03) ---------- */
+
+test('HPE config packs GPUs into the right chassis, no prices anywhere', async () => {
+  const { buildHpeConfig } = await import('../src/lib/tokenops/hpeConfig.js');
+  const { hardwareCeiling } = await import('../src/lib/tokenops/costs.js');
+  const hardware = (await import('../src/data/tokenops/hardware-profiles.json', { with: { type: 'json' } })).default;
+  const ceiling = hardwareCeiling(structuredClone(defaults), 10000);
+  // 24 H200s -> 3x XD685.
+  let cfg = buildHpeConfig({ ...structuredClone(defaults), gpuChoice: 'nvidia_h200' }, { recommendedGpuCount: 24, protectedStorageTB: 40 }, ceiling, null, hardware);
+  expect(cfg.servers).toBe(3);
+  expect(cfg.lines[0].item).toContain('XD685');
+  // 12 RTX PRO 6000 -> 2x DL380a Gen12.
+  cfg = buildHpeConfig({ ...structuredClone(defaults), gpuChoice: 'nvidia_rtx_pro_6000_blackwell' }, { recommendedGpuCount: 12, protectedStorageTB: 10 }, ceiling, null, hardware);
+  expect(cfg.servers).toBe(2);
+  expect(cfg.lines[0].item).toContain('DL380a');
+  // MI355X -> XD685.
+  cfg = buildHpeConfig({ ...structuredClone(defaults), gpuChoice: 'amd_mi355x' }, { recommendedGpuCount: 8, protectedStorageTB: 20 }, ceiling, null, hardware);
+  expect(cfg.servers).toBe(1);
+  expect(cfg.lines[0].item).toContain('XD685');
+  // The budget line carries the ceiling, and nothing in the card is a price of a part.
+  expect(cfg.budgetLine).toContain('must land under');
+  const together = JSON.stringify(cfg);
+  expect(together).not.toMatch(/\$\d+.*per (GPU|server|node)/);
 });

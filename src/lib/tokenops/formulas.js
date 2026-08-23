@@ -432,7 +432,7 @@ defs.push({
   id: 'outputTokensPerRun', section: 'anatomy', unit: 'tokens per run',
   title: 'Output tokens per run',
   shortAnswer: 'All completion-side tokens one run produces.',
-  whyItMatters: 'Output tokens usually cost 3 to 5 times input tokens.',
+  whyItMatters: 'Output tokens cost five to six times input tokens at every shipped provider rate.',
   plainEnglish: 'sum over roles of calls times output tokens per call, retries included, plus memory writes',
   algebra: 'outputTokensPerRun = sum(roleCalls * retryScale * roleOutputTokens) + plannerReplans * plannerOutputTokens + retryScale * memoryWriteTokens',
   when: (s) => s.wlModernAgent,
