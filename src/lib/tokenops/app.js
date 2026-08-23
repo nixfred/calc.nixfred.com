@@ -4,11 +4,15 @@
 
 import { engine } from './formulas.js';
 import { validateInputs, fmt, money } from './engine.js';
-import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers, primaryLeverOf } from './costs.js';
+import { roleRoutedCost, providerComparison, cachingSavings, hardwareCeiling, breakEvenTokens, rentedGpuCost, optimizationLevers, primaryLeverOf, financeDecision } from './costs.js';
+import { buildHpeConfig } from './hpeConfig.js';
 import { recommend, confidence, discoveryQuestions, privatePolicyScore } from './routes.js';
 import { SECTIONS, MEETING_STEPS, TOPOLOGY_PRESETS, WORKLOAD_PRESETS, LIKERT_LABELS } from './sections.js';
 import * as C from './components.js';
 import * as X from './exports.js';
+import PRESETS_REG from '../../data/tokenops/presets.json';
+import { infoButton, openTeach } from './teach.js';
+import EXAMPLE_CUSTOMERS from '../../data/tokenops/example-customers.json';
 
 export const VERSION = 'v1.0.0';
 
@@ -37,15 +41,69 @@ function setPath(obj, path, value) {
 
 export function createApp(root, data) {
   const { rates, hardware, sources, rules, providerMeta } = data;
+  // Pristine copy so Start over can truly reset EVERYTHING, including
+  // user-edited rate cells (Fred's catch: rates survived the reset).
+  const pristineRates = structuredClone(rates);
+  function resetRates() { rates.splice(0, rates.length, ...structuredClone(pristineRates)); }
   let state = structuredClone(data.defaults);
   let weightOverrides = {};
-  let view = 'chooser';
+  let view = 'start';
   let meetingStep = 0;
+  let startSel = { pattern: null, scale: 'department', data: 'yes' };
+  let landingMeta = null;
+
+  function deepMergeState(base, patch) {
+    const out = { ...base, ...patch };
+    if (patch.roles) {
+      out.roles = structuredClone(base.roles);
+      for (const [role, cfg] of Object.entries(patch.roles)) out.roles[role] = { ...out.roles[role], ...cfg };
+    }
+    return out;
+  }
+
+  function applyPatternFlow() {
+    const pat = PRESETS_REG.patterns[startSel.pattern];
+    const band = PRESETS_REG.scaleBands[startSel.scale];
+    let next = deepMergeState(structuredClone(data.defaults), pat.patch);
+    if (band.users !== undefined && pat.patch.wlModernAgent !== false) next.users = band.users;
+    if (band.runsPerUserPerDay !== undefined) next.runsPerUserPerDay = band.runsPerUserPerDay;
+    if (startSel.pattern === 'coding-assistant' && band.users) { next.developers = Math.round(band.users * 0.75); next.acDevelopers = Math.max(2, Math.round(band.users * 0.25)); }
+    next.dataCanLeave = startSel.data;
+    if (startSel.data === 'no') { next.requiresOnPrem = false; next.permitsPublicCloud = false; next.promptsCanLeave = 'no'; next.docsCanLeave = 'no'; }
+    if (startSel.data === 'with-controls') { next.promptsCanLeave = 'yes'; next.docsCanLeave = 'yes'; }
+    next.scenarioName = pat.label;
+    state = next;
+    landingMeta = {
+      title: pat.label, tagline: pat.tagline, howCommon: pat.howCommon,
+      assumptions: pat.assumptions,
+      wizard: `${pat.label} + ${band.label} + data ${startSel.data}`,
+    };
+    view = 'landing';
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function applyPersonaFlow(idx) {
+    const p = EXAMPLE_CUSTOMERS[idx];
+    state = deepMergeState(structuredClone(data.defaults), p.inputs);
+    state.scenarioName = `${p.companyName} (${p.tier} example)`;
+    landingMeta = {
+      title: p.companyName, story: p.story, groundedIn: p.groundedIn,
+      assumptions: (p.variableNotes ?? []).slice(0, 6).map((n) => ({ label: `${n.variable} = ${n.value}`, why: n.meaning, verify: true })),
+      variableNotes: p.variableNotes,
+    };
+    view = 'landing';
+    render();
+    window.scrollTo(0, 0);
+  }
   let recomputeTimer = null;
 
   const shared = X.parseShareLink();
   const auto = shared ? null : X.persistence.loadAutosave();
-  if (shared?.s) { state = { ...state, ...shared.s }; weightOverrides = shared.w ?? {}; view = 'architect'; }
+  let fromShare = false;
+  // A shared link should open on the ANSWER, not the sixteen-section Architect
+  // scroll. The meeting answer page is self-contained (recap plus recommendation).
+  if (shared?.s) { state = { ...state, ...shared.s }; weightOverrides = shared.w ?? {}; view = 'meeting'; meetingStep = MEETING_STEPS.length; fromShare = true; }
   else if (auto?.state) { state = { ...state, ...auto.state }; weightOverrides = auto.weightOverrides ?? {}; }
 
   /* ---------- compute ---------- */
@@ -70,9 +128,13 @@ export function createApp(root, data) {
       : 'Public list pricing may not match contract pricing.';
     const lever0 = primaryLeverOf(levers);
     if (lever0) rec.primaryLever = `${lever0.label} (saves about ${Math.round(lever0.savings).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} per month).`;
+    // Pass the winning route so the finance banner reconciles with it instead
+    // of shouting GET A QUOTE next to a managed-route recommendation.
+    const fin = financeDecision(state, providerBaseline, ceiling, rec.kind === 'do-not-size' ? null : rec.top?.key);
     const disc = discoveryQuestions(state);
     const policy = privatePolicyScore(state, rules, weightOverrides);
-    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy };
+    const hpeConfig = buildHpeConfig(state, values, ceiling, fin, hardware);
+    return { errors, traces, values, selected, cmp, providerBaseline, ceiling, be, rented, caching, levers, rec, conf, disc, policy, fin, hpeConfig };
   }
 
   /* ---------- field rendering ---------- */
@@ -93,7 +155,7 @@ export function createApp(root, data) {
       if (choices === 'HARDWARE') choices = hardware.filter((h) => h.category === 'GPU').map((h) => [h.id, `${h.vendor} ${h.name}`]);
       control = `<select id="${id}" data-field="${esc(f.key)}">${choices.map(([v, l]) => `<option value="${esc(v)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
     }
-    return `<div class="field"><label for="${id}">${esc(f.label)}</label>${control}${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ''}</div>`;
+    return `<div class="field"><label for="${id}">${esc(f.label)}${infoButton(f.key)}</label>${control}${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ''}</div>`;
   }
 
   function sectionTraces(sectionId, cx) {
@@ -121,6 +183,28 @@ export function createApp(root, data) {
     return `<div class="card error-card">${errors.map((e) => `<p class="warn warn-${e.severity}"><span class="warn-tag">${e.severity}</span> ${esc(e.message)}</p>`).join('')}</div>`;
   }
 
+  // Plain sentences a seller can read aloud, instead of the scoring jargon in
+  // rulesFired ("Private policy score (55 pts * factor) added 27.5 points").
+  // The recommendation card keeps the full point math one card up.
+  function sayableWhy(rec) {
+    if (rec.kind === 'do-not-size') return rec.missing.slice(0, 3);
+    const SAY = {
+      direct: 'Speed to first value and model quality point to going straight to a provider.',
+      cloud: 'An existing cloud commitment and managed operations favor the cloud model service.',
+      airia: 'A governed agent-builder platform fits the integration and governance needs here.',
+      kamiwaza: 'Data restrictions push this work toward private, in-environment execution.',
+      btg: 'Readiness gaps and vendor selection favor a strategy and build partner first.',
+      hpePcai: 'Governance plus a hardware preference favor an integrated private AI platform.',
+      rentedGpu: 'High token pressure with no measured benchmark says rent and measure before buying.',
+      owned: 'Steady, high volume, around the clock usage is what owned hardware is for.',
+      hybrid: 'A mix of workloads and policies favors routing each task to the cheapest place it can run.',
+    };
+    const head = SAY[rec.top.key] ?? `${rec.top.label} scored highest on the weighted factors.`;
+    const extras = [...rec.top.components].filter((c) => c.points > 0).sort((a, b) => b.points - a.points).slice(0, 2)
+      .map((c) => c.label.replace(/\s*\([^)]*\)/g, '').trim());
+    return [head, ...extras];
+  }
+
   function resultsStack(cx, meeting = false) {
     const runs = cx.values.monthlyRuns ?? 0;
     const wb = C.whiteboardCard({
@@ -128,7 +212,7 @@ export function createApp(root, data) {
       monthlyRuns: runs,
       monthlyTokens: cx.values.totalMonthlyTokens ?? 0,
       route: cx.rec.kind === 'do-not-size' ? 'Do not size yet' : cx.rec.top.label,
-      why: cx.rec.rulesFired.slice(0, 3),
+      why: sayableWhy(cx.rec),
       breakEvenMTok: cx.be?.result,
       // Same basis as breakEvenTokens: the sentence must reproduce its own
       // arithmetic (audit finding). Budget is quote-derived when a quote exists.
@@ -136,14 +220,16 @@ export function createApp(root, data) {
       costPerMillion: cx.be?.weightedCostPerMillion,
       next: cx.rec.nextAction,
     });
-    const econ = `<div class="card" id="econ-card">
+    const econ = `${C.decisionCard(state, cx.fin, cx.providerBaseline, cx.ceiling)}<div class="card" id="econ-card">
       <h3 class="card-title">The hardware budget ceiling</h3>
       <p class="ceiling-headline mono">${money(cx.ceiling.ceilingCapex)}</p>
       <p>For on premises to make sense, the recommended configuration must come in under this number all-in (${money(cx.ceiling.ceilingMonthly)} per month over ${state.usefulLifeMonths} months). TokenOps does not price hardware. It tells you what the hardware has to cost.</p>
       <div class="quote-slot">
-        <label for="f-gpuQuote-inline">Enter a real quote (USD)</label>
+        <label for="f-gpuQuote-inline">Enter a real quote (USD, all-in: servers, storage, network, and services)${C.infoButton('gpuQuote')}</label>
         <input id="f-gpuQuote-inline" type="number" min="0" step="1000" data-field="gpuQuote" value="${state.gpuQuote ?? ''}">
-        ${cx.ceiling.verdict ? `<p class="verdict ${cx.ceiling.verdict.under ? 'under' : 'over'}">${cx.ceiling.verdict.under ? 'UNDER the ceiling' : 'OVER the ceiling'} by ${money(cx.ceiling.verdict.delta)} (${money(cx.ceiling.verdict.monthlyEquivalent)} per month equivalent). ${cx.ceiling.verdict.under ? 'This quote beats the token route by your required margin.' : 'This quote does not beat the token route. Negotiate or stay on tokens.'}</p>` : ''}
+        ${cx.ceiling.verdict ? (cx.ceiling.verdict.implausible
+          ? `<p class="verdict over">That is not a real quote. Enter the actual all-in number (anything under ${money(cx.ceiling.verdict.floor)} here is a typo, not a deal).</p>`
+          : `<p class="verdict ${cx.ceiling.verdict.under ? 'under' : 'over'}">${cx.ceiling.verdict.under ? 'UNDER' : 'OVER'} the ${money(cx.ceiling.ceilingCapex)} ceiling by ${money(cx.ceiling.verdict.delta)}. Amortized, this quote costs ${money(cx.ceiling.verdict.monthlyEquivalent)} per month against the ${money(cx.ceiling.ceilingMonthly)} monthly bar. ${cx.ceiling.verdict.under ? 'It beats the token route by your required margin.' : 'It does not clear your margin. Negotiate, or stay on tokens.'}</p>`) : ''}
       </div>
       <p class="dim">Ceiling baseline in use: ${state.ceilingBaseline === 'selected' ? 'your selected role routing total' : 'the cheapest provider family total'} (change under Economics and the ceiling).</p>
       ${cx.selected.missingRoles?.length ? `<p class="warn warn-caution"><span class="warn-tag">caution</span> No price for ${cx.selected.missingRoles.join(', ')}. Those tokens are counted in demand but excluded from every dollar figure until a rate is entered.</p>` : ''}
@@ -155,11 +241,17 @@ export function createApp(root, data) {
       ${cx.rented ? C.formulaTrace(cx.rented, sources) : ''}
     </div>`;
     const parts = [
+      // Answer first, always (site law: one sentence answer, details second).
+      // In meeting mode the recap follows the recommendation, it no longer
+      // buries the answer under a restatement of the inputs.
       C.recommendationCard(cx.rec, cx.conf, sources),
+      ...(meeting ? [C.inputsRecapCard(state)] : []),
       econ,
+      C.hpeConfigCard(cx.hpeConfig, sources),
       C.optimizationCard(cx.levers),
       C.providerTable(cx.cmp, providerMeta, sources),
       wb,
+      C.scriptCard(cx, state),
       C.discoveryCard(cx.disc),
     ];
     if (!meeting) {
@@ -240,19 +332,19 @@ export function createApp(root, data) {
     const cx = compute();
     const last = meetingStep >= MEETING_STEPS.length;
     const step = last ? null : MEETING_STEPS[meetingStep];
-    root.innerHTML = `
+    root.innerHTML = `${C.appNav(view === 'meeting' && meetingStep >= MEETING_STEPS.length ? 'meeting-answer' : 'meeting', !!landingMeta)}
       <div class="wizard">
         <div class="wiz-nav mono">${MEETING_STEPS.map((s, i) => `<span class="wiz-dot ${i === meetingStep ? 'cur' : i < meetingStep ? 'done' : ''}">${i + 1}</span>`).join('')}<span class="wiz-dot ${last ? 'cur' : ''}">=</span></div>
         ${last ? `
           <h2>The answer</h2>
           ${errorsHtml(cx.errors)}
           <div id="results">${resultsStack(cx, true)}</div>
-          <div class="btn-row"><button data-wiz="back">back</button></div>
+          <div class="btn-row">${landingMeta ? '<button data-goto="landing">back to your starting point</button>' : '<button data-wiz="back">back</button>'}</div>
         ` : `
           <h2>${esc(step.title)}</h2>
           <div class="wiz-fields">${step.fields.map(fieldHtml).join('')}</div>
           <div class="btn-row">
-            ${meetingStep > 0 ? '<button data-wiz="back">back</button>' : '<button data-goto="chooser">start over</button>'}
+            ${meetingStep > 0 ? '<button data-wiz="back">back</button>' : '<button data-goto="start">back to start</button>'}
             <button class="primary" data-wiz="next">${meetingStep === MEETING_STEPS.length - 1 ? 'show the answer' : 'next'}</button>
           </div>
         `}
@@ -271,11 +363,11 @@ export function createApp(root, data) {
         <div class="a-traces" data-traces-for="${sec.id}">${sectionTraces(sec.id, cx)}</div>
       </section>`;
     }).join('');
-    root.innerHTML = `
+    root.innerHTML = `${C.appNav('architect', !!landingMeta)}
       <div class="architect">
         <nav class="a-nav mono" aria-label="Sections">${SECTIONS.filter((s) => !s.when || s.when(state)).map((s) => `<a href="#sec-${s.id}">${esc(s.title)}</a>`).join('')}<a href="#results">Results</a></nav>
         <div class="a-body">
-          <div class="btn-row"><button data-goto="chooser">mode chooser</button>
+          <div class="btn-row"><button data-goto="start">start</button>${landingMeta ? '<button data-goto="landing">your starting point</button>' : ''}
             <select id="preset-select"><option value="">apply preset...</option>${Object.entries(WORKLOAD_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('')}</select>
             <button id="reset-all">reset to defaults</button>
           </div>
@@ -288,7 +380,11 @@ export function createApp(root, data) {
   }
 
   function render() {
-    if (view === 'chooser') renderChooser();
+    if (view === 'chooser') view = 'start'; // legacy chooser retired: it had no way back (Fred: trapped)
+    if (view === 'landing' && !landingMeta) view = 'start';
+    const nav = C.appNav(view, !!landingMeta);
+    if (view === 'start') { root.innerHTML = nav + C.startScreen(PRESETS_REG, EXAMPLE_CUSTOMERS, startSel); decodeIn(root); updateSummaryBar(); return; }
+    if (view === 'landing') { const lcx = compute(); root.innerHTML = nav + C.landingPanel(landingMeta, PRESETS_REG, lcx.hpeConfig, sources); decodeIn(root); updateSummaryBar(); return; }
     else if (view === 'meeting') renderMeeting();
     else renderArchitect();
     updateSummaryBar();
@@ -297,7 +393,7 @@ export function createApp(root, data) {
   function updateSummaryBar() {
     const bar = document.getElementById('tokenops-summary');
     if (!bar) return;
-    if (view === 'chooser') { bar.classList.add('hidden'); return; }
+    if (view === 'chooser' || view === 'start') { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
     const cx = compute();
     bar.innerHTML = C.summaryBar({
@@ -308,15 +404,28 @@ export function createApp(root, data) {
     });
   }
 
-  /* Refresh computed zones without touching focused inputs. */
+  /* Refresh computed zones. The results panel contains live inputs (quote
+     box, sliders), so focus and caret must survive the innerHTML rebuild
+     or typing feels like the screen locks (Fred hit this live). */
   function refreshResults() {
     const cx = compute();
+    const active = document.activeElement;
+    const restore = active && active.id && (active.closest('#results') || active.closest('[data-traces-for]'))
+      ? { id: active.id, start: active.selectionStart, end: active.selectionEnd }
+      : null;
     document.querySelectorAll('[data-traces-for]').forEach((el) => {
       el.innerHTML = sectionTraces(el.dataset.tracesFor, cx);
     });
     const res = document.getElementById('results');
     if (res && view === 'architect') res.innerHTML = `<h2 class="a-title">Results</h2>${resultsStack(cx, false)}`;
     if (res && view === 'meeting') res.innerHTML = resultsStack(cx, true);
+    if (restore) {
+      const el = document.getElementById(restore.id);
+      if (el) {
+        el.focus({ preventScroll: true });
+        if (restore.start != null && el.setSelectionRange) try { el.setSelectionRange(restore.start, restore.end); } catch {}
+      }
+    }
     updateSummaryBar();
     X.persistence.autosave(state, weightOverrides);
   }
@@ -328,10 +437,14 @@ export function createApp(root, data) {
     const t = e.target;
     if (t.dataset.field && !t.dataset.toggle && t.dataset.likert === undefined) {
       const raw = t.value;
-      const val = t.type === 'number' ? (raw === '' ? null : Number(raw)) : raw;
+      const val = (t.type === 'number' || t.type === 'range') ? (raw === '' ? null : Number(raw)) : raw;
       setPath(state, t.dataset.field, val);
       if (t.dataset.field === 'topologyType' && TOPOLOGY_PRESETS[raw]) Object.assign(state, TOPOLOGY_PRESETS[raw]);
       debouncedRefresh();
+    }
+    if (t.type === 'range' && t.dataset.field) {
+      const lab = t.parentElement.querySelector('.slider-val');
+      if (lab) lab.textContent = t.dataset.field === 'gpuQuote' ? '$' + Number(t.value).toLocaleString() : (t.dataset.field === 'financeAprPercent' ? t.value + '%' : t.value);
     }
     if (t.dataset.weight !== undefined) {
       weightOverrides[t.dataset.weight] = Number(t.value);
@@ -354,6 +467,8 @@ export function createApp(root, data) {
       if (t.dataset.field === 'modelSizeQuickPick' && t.value) state.modelParamsB = Number(t.value);
       if (view === 'architect') render(); else debouncedRefresh();
     }
+    if (t.id === 'start-scale') { startSel.scale = t.value; return; }
+    if (t.id === 'start-data') { startSel.data = t.value; return; }
     if (t.id === 'preset-select' && t.value) {
       const p = WORKLOAD_PRESETS[t.value];
       state = { ...structuredClone(data.defaults), ...p.patch, scenarioName: p.label };
@@ -374,6 +489,25 @@ export function createApp(root, data) {
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.teach) { openTeach(b.dataset.teach); return; }
+    if (b.dataset.pattern !== undefined) {
+      startSel.pattern = b.dataset.pattern; render();
+      // On a phone the follow-up questions render below a tall single-column
+      // grid, so the tap looks like it did nothing. Bring them into view.
+      document.querySelector('.start-follow')?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      return;
+    }
+    if (b.dataset.persona !== undefined) { applyPersonaFlow(Number(b.dataset.persona)); return; }
+    if (b.id === 'start-go') { applyPatternFlow(); return; }
+    if (b.dataset.navReset) {
+      state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null;
+      startSel = { pattern: null, scale: 'department', data: 'yes' };
+      resetRates();
+      history.replaceState(null, '', location.pathname); // drop stale #sec-... anchors
+      X.persistence.autosave(state, weightOverrides);
+      view = 'start'; meetingStep = 0; render(); window.scrollTo(0, 0); return;
+    }
+    if (b.dataset.goto === 'meeting-answer') { view = 'meeting'; meetingStep = MEETING_STEPS.length; render(); window.scrollTo(0, 0); return; }
     if (b.dataset.goto) { view = b.dataset.goto; meetingStep = 0; render(); window.scrollTo(0, 0); return; }
     if (b.dataset.wiz === 'next') { meetingStep++; renderMeeting(); updateSummaryBar(); window.scrollTo(0, 0); return; }
     if (b.dataset.wiz === 'back') { meetingStep = Math.max(0, meetingStep - 1); renderMeeting(); updateSummaryBar(); window.scrollTo(0, 0); return; }
@@ -435,7 +569,7 @@ export function createApp(root, data) {
       X.persistence.save(name, state, weightOverrides); render();
     }
     if (kind === 'wipe') {
-      if (confirm('Clear autosave and all locally saved scenarios on this browser?')) { X.persistence.clearAll(); state = structuredClone(data.defaults); weightOverrides = {}; render(); }
+      if (confirm('Clear autosave and all locally saved scenarios on this browser?')) { X.persistence.clearAll(); state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null; resetRates(); history.replaceState(null, '', location.pathname); render(); }
     }
   }
 
@@ -476,7 +610,7 @@ export function createApp(root, data) {
       exportMath: () => X.detailedMathMarkdown(exportContext().ctx),
       exportJson: () => X.scenarioJson(state, weightOverrides, VERSION),
       shareLink: () => X.shareLink(state, weightOverrides),
-      reset: () => { state = structuredClone(data.defaults); weightOverrides = {}; render(); },
+      reset: () => { state = structuredClone(data.defaults); weightOverrides = {}; landingMeta = null; resetRates(); render(); },
     },
   };
 }

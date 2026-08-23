@@ -3,11 +3,12 @@ import Base from '../layouts/Base.astro';
 import '../styles/tokenops.css';
 ---
 <Base
-  title="TokenOps - calc.nixfred.com"
+  title="TokenOps · calc.nixfred.com"
   description="AI workload placement and token economics calculator. Transparent math: every number shows its formula, variables, live substitution, assumptions, and sources. Never a quote."
 >
   <div class="tokenops-summary hidden" id="tokenops-summary" aria-live="polite"></div>
   <main class="tokenops-main">
+    <p class="dim howto-link">New here? Read the field manual: <a href="/howto/tokenops">how to use TokenOps</a>.</p>
     <div id="tokenops-root">
       <noscript><p>TokenOps calculates entirely in your browser and needs JavaScript. Nothing you enter leaves this page.</p></noscript>
     </div>

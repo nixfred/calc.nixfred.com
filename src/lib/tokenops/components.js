@@ -2,8 +2,34 @@
    FormulaTrace blocks render ALWAYS EXPANDED (decision 0.5.20). */
 
 import { fmt, money } from './engine.js';
+import { infoButton } from './teach.js';
+export { infoButton };
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* The four-outputs law: the customer answer, the whiteboard card, and the
+   next action all exist; this is the conversation script, the words the seller
+   actually says. Every dollar figure is the same variable shown in the ceiling
+   card and traces above, so a line can be read aloud and pointed at. */
+export function scriptCard(cx, state) {
+  const rec = cx.rec;
+  if (!rec || rec.kind === 'do-not-size') return '';
+  const pct = Math.min(90, Math.max(0, state.savingsThresholdPercent ?? 40));
+  const lines = [
+    `On the answer: "The math points to ${esc(rec.top.label)}. Tokens at this shape run about ${money(cx.providerBaseline)} a month, and every assumption behind that number is on this screen."`,
+    `On buying hardware: "Nobody should buy GPUs off an estimate. A real quote has to come in under ${money(cx.ceiling.ceilingCapex)} all-in to beat tokens by the ${pct} percent margin you set."`,
+  ];
+  if (state.usageConfidence !== 'measured') {
+    lines.push('On confidence: "These usage numbers are estimated, not measured. Treat this as direction today and commitment after a 30 to 60 day telemetry pilot."');
+  }
+  if ((rec.warnings ?? []).some((w) => w.severity === 'critical')) {
+    lines.push('On policy: "Your own gate says data cannot leave. Anything public is off the table until that changes, whatever the economics say."');
+  }
+  return `<div class="card"><h3 class="card-title">Conversation script</h3>
+    <ol>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ol>
+    <button class="copy-btn" data-copy="${esc(lines.join('\n\n'))}">copy script</button>
+  </div>`;
+}
 
 export function sourceLinkPills(sourceIds, sources) {
   if (!sourceIds?.length) return '';
@@ -93,6 +119,206 @@ export function recommendationCard(rec, conf, sources = []) {
   </div>`;
 }
 
+/* Preset-driven front door (spec amendment 20c): patterns are the entry,
+   grounded in verified deployment research, with example Customers as
+   flagship starting points. */
+export function startScreen(presets, personas, sel) {
+  const patternCards = Object.entries(presets.patterns).map(([k, p]) => `
+    <button type="button" class="pattern-card ${sel.pattern === k ? 'on' : ''}" data-pattern="${esc(k)}">
+      <span class="pc-label">${esc(p.label)}</span>
+      <span class="pc-tag dim">${esc(p.tagline)}</span>
+      <span class="pc-common mono">${esc(p.howCommon.split(';')[0].split('(')[0].trim())}</span>
+    </button>`).join('');
+  const personaCards = personas.map((p, i) => `
+    <button type="button" class="persona-card" data-persona="${i}">
+      <span class="pc-tier mono">${esc(p.scaleLabel ?? p.tier.toUpperCase())}</span>
+      <span class="pc-label">${esc(p.companyName)}</span>
+      <span class="pc-tag dim">${esc(p.industry)}</span>
+    </button>`).join('');
+  const followups = sel.pattern ? `
+    <div class="start-follow">
+      <div class="field"><label>Who touches it, at what scale?</label>
+        <select id="start-scale">${Object.entries(presets.scaleBands).map(([k, b]) => `<option value="${k}" ${sel.scale === k ? 'selected' : ''}>${esc(b.label)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Can the data leave your environment?</label>
+        <select id="start-data">
+          <option value="yes" ${sel.data === 'yes' ? 'selected' : ''}>Yes</option>
+          <option value="with-controls" ${sel.data === 'with-controls' ? 'selected' : ''}>Only with controls</option>
+          <option value="no" ${sel.data === 'no' ? 'selected' : ''}>No, it stays inside</option>
+        </select>
+      </div>
+      <button class="primary" id="start-go">Build my starting point</button>
+    </div>` : '<p class="dim">Pick what you are building and two more questions finish the routing.</p>';
+  return `
+    <div class="start">
+      <h1>What are you building?</h1>
+      <p class="lede">Answers what this workload costs per month and where it should run.</p>
+      <p class="dim">Every session starts from a real-world pattern. Grounded in 2025-2026 production deployment research, every assumption shown and adjustable.</p>
+      <div class="pattern-grid">${patternCards}</div>
+      ${followups}
+      <p class="section-label" style="margin-top:2.2rem">or walk in an example Customer's shoes</p>
+      <div class="persona-row">${personaCards}</div>
+      <p class="dim start-skip">Prefer a blank sheet? <button class="linklike" data-goto="meeting">Meeting Mode</button> &middot; <button class="linklike" data-goto="architect">Architect Mode</button></p>
+    </div>`;
+}
+
+/* Persistent in-app navigation: no view is ever a dead end (Fred: "I kinda
+   trapped", 2026-07-03). Current view highlighted, landing appears once a
+   starting point exists. */
+export function appNav(view, hasLanding) {
+  const item = (v, label) => `<button type="button" class="nav-item ${view === v ? 'on' : ''}" data-goto="${v}">${label}</button>`;
+  return `<nav class="app-nav mono" aria-label="Calculator navigation">
+    ${item('start', 'Start')}
+    ${hasLanding ? item('landing', 'Starting point') : ''}
+    ${item('meeting-answer', 'Answer')}
+    ${item('architect', 'Every dial')}
+    <a class="nav-item" href="/howto/tokenops">Manual</a>
+    <a class="nav-item" href="/">All calculators</a>
+    <button type="button" class="nav-item nav-reset" data-nav-reset="1" title="Wipe inputs and begin fresh">Start over</button>
+  </nav>`;
+}
+
+export function landingPanel(meta, presets, hpeConfig = null, sources = []) {
+  const rows = (meta.assumptions ?? []).map((a) => `
+    <tr class="${a.verify ? 'verify-row' : ''}">
+      <td>${a.verify ? '<span class="verify-flag mono">VERIFY</span>' : ''}</td>
+      <td><b>${esc(a.label)}</b><br><span class="dim">${esc(a.why)}</span></td>
+      <td><button class="linklike" data-goto="architect">adjust</button></td>
+    </tr>`).join('');
+  const notes = meta.variableNotes?.length ? `
+    <details class="weight-group" open><summary>Every number, explained: what it means and what it drives</summary>
+      <div class="table-wrap"><table class="cmp-table"><thead><tr><th>variable</th><th>value</th><th>what it means here</th><th>what it drives</th></tr></thead><tbody>
+        ${meta.variableNotes.map((n) => `<tr><td class="mono">${esc(n.variable)}</td><td class="mono num">${esc(n.value)}</td><td>${esc(n.meaning)}</td><td>${esc(n.drives)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </details>` : '';
+  return `
+    <div class="wizard" style="max-width: 52rem;">
+      <h1>${esc(meta.title)}</h1>
+      ${meta.story ? `<p class="landing-story">${esc(meta.story)}</p>` : `<p class="dim">${esc(meta.tagline ?? '')}</p>`}
+      ${meta.howCommon ? `<p class="dim"><span class="k">how common</span> ${esc(meta.howCommon)}</p>` : ''}
+      ${meta.groundedIn ? `<p class="dim"><span class="k">grounded in</span> ${esc(meta.groundedIn)}</p>` : ''}
+      <div class="card">
+        <h3 class="card-title">What we just assumed for you</h3>
+        <p class="dim">Starting points, not truths. The flagged rows are the ones to verify with the Customer before anyone quotes anything.</p>
+        <div class="table-wrap"><table class="cmp-table"><tbody>${rows}</tbody></table></div>
+        ${meta.wizard ? `<p class="dim mono" style="font-size:0.75rem">routed by: ${esc(meta.wizard)}</p>` : ''}
+      </div>
+      ${notes}
+      ${hpeConfig ? hpeConfigCard(hpeConfig, sources) : ''}
+      <div class="btn-row">
+        <button class="primary" data-goto="meeting-answer">See the answer</button>
+        <button data-goto="architect">Open every dial</button>
+        <button data-goto="start">Start over</button>
+      </div>
+    </div>`;
+}
+
+/* Meeting Mode answer page: relist everything entered in the wizard so the
+   report is self-contained (Fred's ask, 2026-07-03). */
+export function inputsRecapCard(state) {
+  const yn = (v) => (v ? 'yes' : 'no');
+  const quick = [
+    state.wlRag ? `RAG assistant quick workload: ${state.concurrentConnections} connections x ${state.ragDays} days x ${state.ragHours} hours` : null,
+    state.wlAgents ? `Always-on agents quick workload: ${state.workflows} workflows x ${state.agDays} days x ${state.agHours} hours` : null,
+    state.wlCoding ? `Coding assistant quick workload: ${state.developers} developers x ${state.codDays} days x ${state.codHours} hours` : null,
+    state.wlAgenticCoding ? `Agentic coding quick workload: ${state.acDevelopers} developers x ${state.acDays} days x ${state.acHours} hours` : null,
+    (state.customWorkloadMonthlyTokens ?? 0) > 0 ? `Custom workload: ${fmt(state.customWorkloadMonthlyTokens)} tokens per month` : null,
+  ].filter(Boolean);
+  const rows = [
+    ['Scenario', state.scenarioName],
+    ['Customer', state.customerName],
+    ['Customer size', state.customerSize],
+    ['Budget signal', state.budgetConfidence],
+    ['Users', fmt(state.users)],
+    ['Runs per user per day', state.runsPerUserPerDay],
+    ['Adoption', `${state.adoptionPercent}%`],
+    ['Active days per month', state.activeDaysPerMonth],
+    ['Data can leave', state.dataCanLeave ?? 'unanswered'],
+    ['Regulated data', yn(state.regulatedData)],
+    ['Must run on premises', yn(state.requiresOnPrem)],
+    ['Agent topology', state.topologyType],
+    ['Prompt cache hits', `${state.cachedInputPercent}%`],
+    ['Retry rate', `${state.retryRatePercent}%`],
+    ['Quick workload input/output split', `${state.quickInputSharePercent ?? 70}/${100 - (state.quickInputSharePercent ?? 70)}`],
+  ];
+  return `<div class="card" id="inputs-recap">
+    <h3 class="card-title">What you told it</h3>
+    <p class="dim">Every answer from the wizard, restated so this report stands alone. Change any of it with back, or in Architect Mode.</p>
+    <div class="table-wrap"><table class="cmp-table"><tbody>
+      ${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="mono">${esc(v)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${quick.length ? `<p class="dim">Also active:</p><ol>${quick.map((q) => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}
+  </div>`;
+}
+
+/* The decision block: unmistakable direction plus finance sliders. */
+export function decisionCard(state, fin, providerMonthlyCost, ceiling) {
+  if (!fin || fin.verdict === 'none') return '';
+  const qMax = Math.max(Math.ceil((ceiling.ceilingCapex || 50000) * 2 / 1000) * 1000, 50000);
+  const banner = `<div class="verdict-banner v-${esc(fin.verdict)}">
+      <span class="v-head mono">${esc(fin.headline)}</span>
+      <span class="v-reason">${esc(fin.reason)}${fin.routeNote ? ` ${esc(fin.routeNote)}` : ''}</span>
+    </div>`;
+  const isCash = (state.financeMode ?? 'cash') !== 'financed';
+  const roi = fin.verdict === 'quote' ? '' : `
+    <div class="roi-grid">
+      <div class="roi-cell"><span class="sum-label">tokens per month</span><span class="sum-value mono">${money(providerMonthlyCost)}</span></div>
+      <div class="roi-cell"><span class="sum-label">${fin.financed ? 'loan payment' : 'cash amortized'} per month</span><span class="sum-value mono">${money(fin.payment)}</span></div>
+      <div class="roi-cell"><span class="sum-label">${fin.horizon} month tokens</span><span class="sum-value mono">${money(fin.totalTokens)}</span></div>
+      <div class="roi-cell"><span class="sum-label">${fin.horizon} month hardware</span><span class="sum-value mono">${money(fin.totalHw)}</span></div>
+      <div class="roi-cell"><span class="sum-label">savings over horizon</span><span class="sum-value mono ${fin.savings >= 0 ? 'v-good' : 'v-bad'}">${money(fin.savings)}</span></div>
+      <div class="roi-cell"><span class="sum-label">ROI on hardware spend</span><span class="sum-value mono ${fin.roiPct >= 0 ? 'v-good' : 'v-bad'}">${fmt(fin.roiPct, 0)}%</span></div>
+      <div class="roi-cell"><span class="sum-label">simple payback</span><span class="sum-value mono">${fin.simplePayback ? fin.simplePayback + ' months' : 'n/a'}</span></div>
+    </div>
+    <p class="mono dim" style="font-size:0.75rem">${esc(fin.substitution)} &middot; horizon = max(term, useful life). ROI = savings / hardware spend.</p>`;
+  return `<div class="card" id="decision-card">
+    <h3 class="card-title">The decision</h3>
+    ${banner}
+    ${roi}
+    <div class="finance-sliders">
+      <label class="slider-row">
+        <span class="slider-label">Hardware quote${infoButton('gpuQuote')}</span>
+        <input type="range" min="0" max="${qMax}" step="1000" value="${state.gpuQuote ?? 0}" data-field="gpuQuote" aria-label="hardware quote dollars">
+        <span class="mono slider-val">${money(state.gpuQuote ?? 0)}</span>
+      </label>
+      <label class="slider-row">
+        <span class="slider-label">How to pay${infoButton('financeMode')}</span>
+        <select data-field="financeMode" style="max-width:12rem">
+          <option value="cash" ${isCash ? 'selected' : ''}>Cash (amortize over useful life)</option>
+          <option value="financed" ${!isCash ? 'selected' : ''}>Financed (loan payment)</option>
+        </select>
+        <span></span>
+      </label>
+      <label class="slider-row ${isCash ? 'slider-muted' : ''}">
+        <span class="slider-label">Term months${infoButton('financeTermMonths')}</span>
+        <input type="range" min="12" max="60" step="6" value="${state.financeTermMonths ?? 36}" data-field="financeTermMonths" aria-label="finance term months" ${isCash ? 'disabled' : ''}>
+        <span class="mono slider-val">${state.financeTermMonths ?? 36}</span>
+      </label>
+      <label class="slider-row ${isCash ? 'slider-muted' : ''}">
+        <span class="slider-label">APR percent${infoButton('financeAprPercent')}</span>
+        <input type="range" min="0" max="15" step="0.5" value="${state.financeAprPercent ?? 8}" data-field="financeAprPercent" aria-label="finance APR percent" ${isCash ? 'disabled' : ''}>
+        <span class="mono slider-val">${state.financeAprPercent ?? 8}%</span>
+      </label>
+    </div>
+    <p class="dim">${isCash ? `Term and APR apply when financed. Cash amortizes over the useful life, ${state.usefulLifeMonths ?? 36} months, the same window as the ceiling. ` : ''}Drag the quote until the verdict flips. That crossing point is the number to negotiate toward. Financing does not change what tokens cost; it changes how you pay for the hardware.</p>
+  </div>`;
+}
+
+/* The all-HPE conversation configuration: the parts list the ceiling must
+   cover. No prices, ever; the ceiling IS the price conversation. */
+export function hpeConfigCard(cfg, sources) {
+  if (!cfg) return '';
+  return `<div class="card" id="hpe-config-card">
+    <h3 class="card-title">The configuration (all HPE, no prices, one bar to clear)</h3>
+    <p class="config-budget">${esc(cfg.budgetLine)}</p>
+    <div class="table-wrap"><table class="cmp-table"><thead><tr><th>qty</th><th>item</th><th>sized by your numbers</th><th>source</th></tr></thead><tbody>
+      ${cfg.lines.map((l) => `<tr><td class="mono num">${l.qty}x</td><td><b>${esc(l.item)}</b></td><td>${esc(l.detail)}</td><td>${sourceLinkPills([l.sourceId], sources)}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="dim">${esc(cfg.alt)}</p>
+    <ol class="dim" style="font-size:0.82rem">${cfg.caveats.map((c) => `<li>${esc(c)}</li>`).join('')}</ol>
+  </div>`;
+}
+
 export function optimizationCard(levers) {
   if (!levers?.length) return '';
   return `<div class="card">
@@ -139,7 +365,7 @@ export function providerTable(cmp, providerMeta, sources) {
   }).join('');
   return `<div class="card">
     <h3 class="card-title">Provider comparison</h3>
-    <p class="dim">The AGENT workload priced inside each provider family, role tiering kept. Quick-formula workloads appear in demand totals but are not priced here. Public list prices, editable in the rates panel. Never a quote.</p>
+    <p class="dim">The whole workload priced inside each provider family: agent roles at their tiers, quick-formula workloads at the worker rate with an editable input/output split. Public list prices, editable in the rates panel. Never a quote. Tier classes differ across families (Azure's workhorse SKU is a mini-class model), so compare like-for-like models before quoting a winner.</p>
     <div class="table-wrap"><table class="cmp-table">
       <thead><tr><th>provider</th><th>monthly</th><th>per run</th><th>per user</th><th>source</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -242,7 +468,7 @@ export function whiteboardCard(data) {
     <h3 class="card-title">Whiteboard card</h3>
     <div class="wb-inner">
       <p class="wb-line"><span class="k">workload</span> ${esc(data.scenario)}</p>
-      <p class="wb-line"><span class="k">volume</span> <span class="mono">${fmt(data.monthlyRuns)}</span> runs/mo &middot; <span class="mono">${fmt(data.monthlyTokens)}</span> tokens/mo</p>
+      <p class="wb-line"><span class="k">volume</span> ${data.monthlyRuns ? `<span class="mono">${fmt(data.monthlyRuns)}</span> runs/mo &middot; ` : ''}<span class="mono">${fmt(data.monthlyTokens)}</span> tokens/mo</p>
       <p class="wb-line"><span class="k">best route</span> ${esc(data.route)}</p>
       <p class="wb-line"><span class="k">why</span></p>
       <ol>${data.why.map((w) => `<li>${esc(w)}</li>`).join('')}</ol>

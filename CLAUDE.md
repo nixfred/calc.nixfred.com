@@ -99,6 +99,17 @@ A calculator that produces only a number is not done.
    next, and what source supports it.
 7. Capital C on Customer when referring to Customers.
 
+## Preset-driven law (Fred, 2026-07-03)
+
+1. Presets are the front door of every calculator, not a side choice.
+2. A short qualifying wizard routes the user to the closest real-world
+   preset; a landing panel lists every assumption, why it was assumed,
+   what to verify, and lets each be adjusted.
+3. Preset numbers must be grounded in verified real-world deployment
+   research with sources, never invented.
+4. Modes (Meeting, Architect) are refinement paths after the preset,
+   not entry points.
+
 ## Adding a new calculator (the process)
 
 1. Fred names the calculator and provides or approves the logic.
@@ -109,7 +120,10 @@ A calculator that produces only a number is not done.
    rendered visibly on the result.
 5. Result section produces all four outputs (answer, whiteboard card,
    script, next action) plus a copy button and a print view.
-6. Flip status to `live` in calculators.json only when Fred approves.
+6. STANDING ORDER (Fred, 2026-07-03): do NOT ask before pushing live.
+   When the harness is green, flip status to `live` and deploy to
+   production immediately, every time. The tests are the gate, not a
+   conversation. Fred reviews the live site and orders changes after.
 7. Document the methodology in `docs/<slug>.md` (public receipts).
 8. One calculator at a time. Never batch.
 
